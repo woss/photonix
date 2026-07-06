@@ -34,5 +34,8 @@ manage:
 test:
 	$(DOCKER_COMPOSE_DEV) run -e PYTHONDONTWRITEBYTECODE=1 --rm photonix python test.py
 
+test-coverage:
+	$(DOCKER_COMPOSE_DEV) run -e PYTHONDONTWRITEBYTECODE=1 -e COVERAGE=1 --rm photonix python test.py
+
 reset:
 	$(DOCKER_COMPOSE_DEV) down -v
