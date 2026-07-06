@@ -170,13 +170,16 @@ class Photo(UUIDModel, VersionedModel):
 
     @property
     def download_url(self):
-        library_url = self.library.get_library_path_store().url
-        if not library_url:
-            library_url = '/photos/'
-        library_path = self.library.get_library_path_store().path
-        if not library_path:
-            library_path = '/data/photos/'
-        return self.base_file.path.replace(library_path, library_url)
+        path = str(self.base_file.path)
+        # Local files live under /data and must not be exposed at their real
+        # (guessable/enumerable) filename — serve them via an unguessable,
+        # uuid4-based per-photo URL instead.
+        if path.startswith('/data'):
+            return '/download/{}/'.format(self.id)
+        # External/remote library backends keep their own direct URL.
+        library_url = self.library.get_library_path_store().url or '/photos/'
+        library_path = self.library.get_library_path_store().path or '/data/photos/'
+        return path.replace(library_path, library_url)
 
     @property
     def dimensions(self):
