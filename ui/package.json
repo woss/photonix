@@ -60,6 +60,12 @@
   "eslintConfig": {
     "extends": "react-app"
   },
+  "jest": {
+    "moduleNameMapper": {
+      "^react-leaflet$": "<rootDir>/src/test-stubs/react-leaflet.js",
+      "^react-leaflet-markercluster$": "<rootDir>/src/test-stubs/react-leaflet.js"
+    }
+  },
   "browserslist": {
     "production": [
       ">0.2%",
