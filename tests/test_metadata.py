@@ -28,11 +28,17 @@ def test_metadata():
 
 
 def test_location():
-    # Conversion from GPS exif data to latitude/longitude
+    # Conversion from GPS exif data to latitude/longitude using
+    # degrees + minutes/60 + seconds/3600
     gps_position = '64 deg 9\' 0.70" N, 21 deg 56\' 3.47" W'
     latitude, longitude = parse_gps_location(gps_position)
-    assert latitude == 64.15011666666668
-    assert longitude == -21.933911666666667
+    assert latitude == pytest.approx(64.15019444444445, abs=1e-9)
+    assert longitude == pytest.approx(-21.934297222222224, abs=1e-9)
+
+    gps_position = '33 deg 51\' 25.20" S, 151 deg 12\' 54.50" E'
+    latitude, longitude = parse_gps_location(gps_position)
+    assert latitude == pytest.approx(-(33 + 51 / 60 + 25.20 / 3600), abs=1e-9)
+    assert longitude == pytest.approx(151 + 12 / 60 + 54.50 / 3600, abs=1e-9)
 
 
 def test_datetime():
