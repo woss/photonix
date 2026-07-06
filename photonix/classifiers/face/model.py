@@ -298,6 +298,14 @@ def run_on_photo(photo_id):
         model.library_id = photo.library_id
     image_data = Image.open(path)
 
+    # Apply the same rotation predict() used so that the detected bounding
+    # boxes line up with the bitmap we crop faces from
+    if photo:
+        from photonix.photos.utils.rotation import apply_photo_rotation
+        image_data = apply_photo_rotation(image_data, photo.base_file)
+    else:
+        image_data = ImageOps.exif_transpose(image_data)
+
     # Loop over each face that was detected above
     for result in results:
         # Crop individual face + 30% extra in each direction
@@ -337,10 +345,13 @@ def run_on_photo(photo_id):
                         tag.save()
                         break
 
-            x = (result['box'][0] + (result['box'][2] / 2)) / photo.base_file.width
-            y = (result['box'][1] + (result['box'][3] / 2)) / photo.base_file.height
-            width = result['box'][2] / photo.base_file.width
-            height = result['box'][3] / photo.base_file.height
+            # Normalize positions by the rotated image's dimensions - the
+            # boxes are relative to the displayed orientation, not the
+            # pre-rotation dimensions stored on the PhotoFile
+            x = (result['box'][0] + (result['box'][2] / 2)) / image_data.width
+            y = (result['box'][1] + (result['box'][3] / 2)) / image_data.height
+            width = result['box'][2] / image_data.width
+            height = result['box'][3] / image_data.height
             score = result['confidence']
 
             extra_data = ''

@@ -24,7 +24,44 @@ def photo_fixture_tree(db):
     return record_photo(tree_path, library)
 
 
-def test_get_or_create_tag_existing_with_different_parent(db):
+def test_face_via_runner_on_rotated_photo(db, tmp_path):
+    # Face bounding boxes are detected on the EXIF-rotated image so the
+    # stored positions must be relative to the displayed orientation and
+    # the embedding crops must come from the rotated bitmap
+    from PIL import Image
+    from photonix.classifiers.face.model import run_on_photo
+    from photonix.classifiers.model_manager import LAST_MODEL_LOAD_KEY
+    from photonix.photos.utils.db import record_photo
+    from photonix.photos.utils.redis import redis_connection
+
+    # Portrait canvas (400x800) with a face near the top, stored rotated
+    # 90 degrees with EXIF orientation 6 so viewers show it upright
+    display = Image.new('RGB', (400, 800), (255, 255, 255))
+    face = Image.open(Path(__file__).parent / 'photos' / 'faces' / 'Boris_Becker_0003.jpg')
+    display.paste(face, (75, 50))  # Face box centre approx (200, 175)
+    stored = display.rotate(90, expand=True)
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    path = str(tmp_path / 'rotated_face.jpg')
+    stored.save(path, exif=exif, quality=95)
+
+    library = LibraryFactory()
+    photo = record_photo(path, library)
+    assert photo.base_file.exif_rotation == 90
+
+    # Clear model load cooldown so this test doesn't depend on test ordering
+    redis_connection.delete(LAST_MODEL_LOAD_KEY)
+    try:
+        photo, results = run_on_photo(photo.id)
+    finally:
+        redis_connection.delete(LAST_MODEL_LOAD_KEY)
+
+    assert len(results) == 1
+    photo_tag = photo.photo_tags.get(tag__type='F')
+    # Face centre is at approx (0.5, 0.22) of the displayed orientation.
+    # Normalizing by pre-rotation dimensions would put it at (0.25, 0.43).
+    assert 0.4 < photo_tag.position_x < 0.6
+    assert 0.1 < photo_tag.position_y < 0.35
     # A tag that already exists with a different parent/ordering must be
     # returned rather than attempting an INSERT that violates the
     # (library, name, type, source) unique constraint and retrying forever
