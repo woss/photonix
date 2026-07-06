@@ -75,7 +75,7 @@ class LocationModel(BaseModel):
         else:
             city = self.get_city(lon=lon, lat=lat)
 
-        if not country and city:
+        if not country and city and city.get('country_name'):
             country = {
                 'name': city['country_name'],
             }
@@ -128,7 +128,9 @@ class LocationModel(BaseModel):
                         largest_population = population
                         largest_city = row[1]
                         chosen_country_code = row[8]
-                        chosen_country_name = countries[chosen_country_code]
+                        # Country codes added after the world borders dataset
+                        # was published (e.g. XK, SS) aren't in it
+                        chosen_country_name = countries.get(chosen_country_code)
 
                 if nearest_distance is None or distance < nearest_distance:
                     nearest_distance = distance

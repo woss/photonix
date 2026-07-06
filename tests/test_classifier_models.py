@@ -107,6 +107,56 @@ def test_location_predict():
     assert result['city']['name'] == 'Téteghem'
 
 
+def test_event_predict(tmpdir):
+    # Photos taken on Dec 31 or Jan 1 must both get the user-facing
+    # 'New Year' tag - 'New Year Start/End' are internal labels
+    import shutil
+    import subprocess
+
+    from photonix.classifiers.event.model import EventModel
+
+    model = EventModel()
+    snow = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+    cases = [
+        ('2020:01:01 00:30:00', ['New Year']),
+        ('2019:12:31 23:30:00', ['New Year']),
+        ('2020:12:25 10:00:00', ['Christmas Day']),
+        ('2020:06:15 10:00:00', []),
+    ]
+    for i, (date_str, expected) in enumerate(cases):
+        path = str(Path(tmpdir) / f'event_{i}.jpg')
+        shutil.copy2(snow, path)
+        subprocess.run(['exiftool', f'-DateTimeOriginal={date_str}', '-overwrite_original', path], check=True)
+        assert model.predict(path) == expected, date_str
+
+
+def test_get_city_handles_country_code_missing_from_world_borders():
+    # Country codes introduced after the world borders dataset was published
+    # (XK for Kosovo, SS for South Sudan) used to raise KeyError
+    from photonix.classifiers.location.model import LocationModel
+
+    model = LocationModel.__new__(LocationModel)  # Skip model download in __init__
+    model._loaded = True
+    model.world = []  # Borders dataset has no entry for XK
+    pristina = [''] * 15
+    pristina[1] = 'Pristina'
+    pristina[4] = '42.6629'
+    pristina[5] = '21.1655'
+    pristina[8] = 'XK'
+    pristina[14] = '216870'
+    model.cities = [pristina]
+
+    city = model.get_city(lon=42.6629, lat=21.1655)
+    assert city['name'] == 'Pristina'
+    assert city['country_code'] == 'XK'
+    assert city['country_name'] is None
+
+    # predict() must not fabricate a country called None from such a city
+    result = model.predict(location=[42.6629, 21.1655])
+    assert result['city']['name'] == 'Pristina'
+    assert result['country'] is None
+
+
 def test_object_predict():
     from photonix.classifiers.object.model import ObjectModel
 

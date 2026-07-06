@@ -25,12 +25,12 @@ class EventModel:
                     datetime.date(date_taken.year, 1, 1): "New Year End",
                 }
                 if events.get(date_taken.date()):
-                    if events.get(date_taken.date()).startswith("New Year"):
-                        start_of_day = datetime.datetime.combine(datetime.date(date_taken.year, 12, 31), datetime.datetime.min.time())
-                        end_of_day = start_of_day + datetime.timedelta(days=1)
-                        if start_of_day <= date_taken.replace(tzinfo=None) <= end_of_day:
-                            return ['New Year']
-                    return [events.get(date_taken.date())]
+                    event_name = events[date_taken.date()]
+                    # "New Year Start"/"New Year End" are internal keys - both
+                    # New Year's Eve and New Year's Day photos get the same tag
+                    if event_name.startswith("New Year"):
+                        return ['New Year']
+                    return [event_name]
         return []
 
 
