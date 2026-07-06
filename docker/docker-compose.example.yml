@@ -14,7 +14,10 @@ services:
       POSTGRES_DB: photonix
       POSTGRES_PASSWORD: password
     volumes:
-      - ./data/db:/var/lib/postgresql/data
+      # Postgres 18 images moved PGDATA below /var/lib/postgresql - mounting
+      # the old /var/lib/postgresql/data path would leave the real database
+      # inside the container and lose it on recreate
+      - ./data/db:/var/lib/postgresql
 
   redis:
     container_name: photonix-redis
