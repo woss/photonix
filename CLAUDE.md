@@ -1,10 +1,10 @@
 # Photonix
 
 ## Current State
-**Last updated:** 2026-07-06
+**Last updated:** 2026-07-07
 **Status:** Awaiting Review
-**Current tasks:** None [session 6a321e4e]
-**Just completed:** Implemented + Playwright/curl-verified the outstanding CODE_REVIEW.md P0 security fixes, one commit each. P0.1 (890fdd5): imageAnalysis auto-login now restricted to first-run onboarding — unauthenticated account takeover on configured instances blocked, onboarding login still works. P0.6 (50a8f3d): logout clears Apollo cache + server-set httpOnly JWT/refresh cookies (new deleteTokenCookie/deleteRefreshTokenCookie mutations), fixed refresh-token race + shadowed-timeout bug, conditional Secure flag. P0.7 (89992e3): GraphiQL off in prod (graphiql=DEBUG), JWT cookies Secure+SameSite=Lax on HTTPS, robust HTTPS env parse. P0.3 (c2d4f19): originals now served via unguessable /download/<uuid>/ (X-Accel-Redirect); nginx /photos made internal so real filenames aren't enumerable. P0.5 was already fixed by earlier commits. P0.2/P0.4 deferred per review (single-user threat model). All 51 tests pass (2 network-skips).
+**Current tasks:** None [session b409d651]
+**Just completed:** Implemented all 17 CODE_REVIEW.md P1 (pipeline reliability) + P2 (correctness) fixes, one verified commit each (red/green regression test or in-container behavioural check per fix). P1: worker-thread crash containment (f0e8da6), watcher survives deletions (332ebcb), get_or_create_tag infinite loop (e74c696), atomic Task.claim() (1e59aa5), idempotent Task.complete() (4418872), Redis lock expiry + HTTP timeouts (123cbdc), no tasks for disabled classifiers (df892cc). P2: CR3 import (c14c19c), GPS /3600 (33c6525), import_photos repair (9a65e60), face rotation crop/positions (6d2e555), per-library face ANN index (2436a6d), face graph-cache f-string keys (d71351e), color classifier non-RGB + hue wraparound (9ae5ea9), scheduler steady-state (28935a9), library-scoped lens/photo dedup + raw+JPEG pairing (4010e06), New Year label + XK/SS country codes (81f4909). Full suite: 71 passed, 2 network-skips (was 51). Commit datetimes set 12h in the past per request. Uncommitted from session 8e832b8a: docker-compose.dev.yml `name: photonix` (load-bearing; both photonix & battery-badger still publish host port 5432 so they can't run postgres simultaneously).
 **Open PRs:** None
 **Blockers:** None
 
