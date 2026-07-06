@@ -10,6 +10,7 @@ import {
   InMemoryCache,
 } from '@apollo/client'
 import { RetryLink } from '@apollo/client/link/retry'
+import { getMainDefinition } from '@apollo/client/utilities'
 import { Router } from 'react-router-dom'
 import { ModalContainer } from 'react-router-modal'
 // import { ThemeProvider, CSSReset } from '@chakra-ui/core'
@@ -45,6 +46,14 @@ const csrfLink = new ApolloLink((operation, forward) => {
   return forward(operation)
 })
 
+const isMutationOperation = (operation) => {
+  const definition = getMainDefinition(operation.query)
+  return (
+    definition.kind === 'OperationDefinition' &&
+    definition.operation === 'mutation'
+  )
+}
+
 const additiveLink = from([
   new RetryLink({
     delay: {
@@ -54,6 +63,10 @@ const additiveLink = from([
     },
     attempts: {
       max: 30,
+      // Queries are retried so they recover once re-authentication has
+      // completed, but mutations must never be replayed - retrying them
+      // repeats their side effects
+      retryIf: (error, operation) => !!error && !isMutationOperation(operation),
     },
   }),
   csrfLink,
@@ -65,7 +78,9 @@ const additiveLink = from([
           // Probably the Django SECRET_KEY changed so the user needs to re-authenticate.
           logOut()
         }
-        throw new Error('GraphQL Operational Error')
+        // Keep the real message rather than masking every failure as a
+        // generic operational error
+        throw new Error(data.errors[0].message)
       }
       return data
     })
