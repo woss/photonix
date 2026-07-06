@@ -25,6 +25,21 @@ PHOTOS = [
 ]
 
 
+def test_get_exiftool_image_returns_output_files(tmpdir):
+    # Used by CR3 processing - a bug where dict entries were annotated
+    # instead of assigned made this always return an empty dict, breaking
+    # Canon CR3 imports entirely
+    from photonix.photos.utils import raw
+
+    basename = 'IMG_0001.CR3'
+    for fn in [basename, 'IMG_0001.jpg', 'IMG_0001.jpg_original']:
+        (Path(tmpdir) / fn).touch()
+
+    result = raw.__get_exiftool_image(str(tmpdir), basename)
+    assert result['output'] == Path(tmpdir) / 'IMG_0001.jpg'
+    assert result['original'] == Path(tmpdir) / 'IMG_0001.jpg_original'
+
+
 def test_extract_jpg():
     for fn, intended_process_params, intended_filesize, urls in PHOTOS:
         raw_photo_path = str(Path(__file__).parent / 'photos' / fn)

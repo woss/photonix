@@ -100,9 +100,9 @@ def __get_exiftool_image(temp_dir, basename):
     exiftool_files = {}
     for fn in os.listdir(temp_dir):
         if fn.endswith('.jpg_original'):
-            exiftool_files['original']: Path(temp_dir) / fn
+            exiftool_files['original'] = Path(temp_dir) / fn
         if fn.endswith('.jpg'):
-            exiftool_files['output']: Path(temp_dir) / fn
+            exiftool_files['output'] = Path(temp_dir) / fn
     return exiftool_files
 
 def __has_acceptable_dimensions(original_image_path, new_image_path, accept_empty_original_dimensions=False):
