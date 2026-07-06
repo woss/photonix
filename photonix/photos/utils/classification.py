@@ -34,10 +34,16 @@ def generate_classifier_tasks_for_photo(photo_id, task):
     if not task.claim():
         return  # Another processor replica claimed this task first
 
-    # Add task for each classifier on current photo
+    # Add task for each enabled classifier on current photo
+    num_created = 0
     with transaction.atomic():
         library = Photo.objects.get(id=photo_id).library
         for classifier, priority in CLASSIFIER_PRIORITIES.items():
+            # Don't create tasks that no processor will pick up - they would
+            # stay Pending forever and block this parent task's completion.
+            # Classifiers without a library toggle (event) are always enabled.
+            if not getattr(library, f'classification_{classifier}_enabled', True):
+                continue
             Task(
                 type='classify.{}'.format(classifier),
                 subject_id=photo_id,
@@ -45,8 +51,13 @@ def generate_classifier_tasks_for_photo(photo_id, task):
                 library=library,
                 priority=priority,
             ).save()
-        task.complete_with_children = True
-        task.save()
+            num_created += 1
+        if num_created:
+            task.complete_with_children = True
+            task.save()
+
+    if not num_created:
+        task.complete()
 
 
 class ThreadedQueueProcessor:

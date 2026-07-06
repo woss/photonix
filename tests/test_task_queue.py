@@ -108,6 +108,38 @@ def test_task_claim_is_atomic(photo_fixture_snow):
     assert not Task.objects.filter(type='generate_thumbnails', subject_id=photo_fixture_snow.id).exists()
 
 
+def test_no_classifier_tasks_created_for_disabled_classifiers(db):
+    # Tasks for disabled classifiers would never be picked up by their
+    # processor, leaving the parent classify_images task incomplete forever
+    from photonix.photos.utils.db import record_photo
+
+    snow_path = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+    library = LibraryFactory(
+        classification_color_enabled=False,
+        classification_location_enabled=False,
+        classification_style_enabled=False,
+        classification_object_enabled=False,
+        classification_face_enabled=False,
+    )
+    photo = record_photo(snow_path, library)
+    task = Task.objects.create(type='classify_images', subject_id=photo.id, library=library)
+
+    process_classify_images_tasks()
+    task.refresh_from_db()
+
+    # Only the event classifier (which has no library toggle) gets a task
+    child_types = set(task.children.values_list('type', flat=True))
+    assert child_types == {'classify.event'}
+
+    # Completing it must complete the parent - before the fix five orphaned
+    # child tasks would have blocked it in Started status permanently
+    for child in task.children.all():
+        child.claim()
+        child.complete()
+    task.refresh_from_db()
+    assert task.status == 'C'
+
+
 def test_sibling_completion_creates_single_downstream_chain(db):
     # A stale duplicate completion (e.g. two replicas racing) must not
     # re-complete tasks or create a second downstream task chain
