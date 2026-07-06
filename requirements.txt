@@ -16,7 +16,6 @@ graphene-django==3.2.3
 Markdown==3.10.2
 Pillow==12.2.0
 
-standard-imghdr==3.13.0
 inotify==0.2.12
 asyncinotify==4.4.2
 python-dateutil==2.9.0.post0

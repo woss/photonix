@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 from decimal import Decimal
-import imghdr
 import mimetypes
 import os, time
 import re
 import subprocess
+
+from PIL import Image, UnidentifiedImageError
 
 utc = timezone.utc
 
@@ -14,7 +15,7 @@ from photonix.web.utils import logger
 
 
 MIMETYPE_WHITELIST = [
-    # This list is in addition to the filetypes detected by imghdr and 'dcraw -i'
+    # This list is in addition to the filetypes detected by Pillow and 'dcraw -i'
     'image/heif',
     'image/heif-sequence',
     'image/heic',
@@ -22,6 +23,16 @@ MIMETYPE_WHITELIST = [
     'image/avif',
     'image/avif-sequence',
 ]
+
+
+def is_image(path):
+    """Detect bitmap image files by their header (replacement for the imghdr
+    module which was removed from the standard library in Python 3.13)."""
+    try:
+        with Image.open(path):
+            return True
+    except (UnidentifiedImageError, OSError):
+        return False
 
 
 def record_photo(path, library, inotify_event_type=None):
@@ -41,7 +52,7 @@ def record_photo(path, library, inotify_event_type=None):
 
     mimetype = get_mimetype(path)
 
-    if not imghdr.what(path) and not mimetype in MIMETYPE_WHITELIST and subprocess.run(['dcraw', '-i', path]).returncode:
+    if not is_image(path) and not mimetype in MIMETYPE_WHITELIST and subprocess.run(['dcraw', '-i', path]).returncode:
         logger.error(f'File is not a supported type: {path} ({mimetype})')
         return None
 
