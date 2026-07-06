@@ -233,7 +233,10 @@ class FaceModel(BaseModel):
                 t.add_item(len(tag_ids), embedding)
                 tag_ids.append(id)
         else:
-            for photo_tag in PhotoTag.objects.filter(tag__type='F').order_by('id'):
+            # Only train on this library's faces - the index is saved
+            # per-library so mixing in other libraries' embeddings causes
+            # wrong matches and leaks faces across libraries
+            for photo_tag in PhotoTag.objects.filter(photo__library_id=self.library_id, tag__type='F').order_by('id'):
                 try:
                     extra_data = json.loads(photo_tag.extra_data)
                     embedding = extra_data['facenet_embedding']

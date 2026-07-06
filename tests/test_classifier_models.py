@@ -114,6 +114,40 @@ def test_style_predict():
     assert result == None
 
 
+def test_face_similarity_index_trained_per_library(db):
+    # The ANN index files are saved per-library so they must only be
+    # trained on that library's faces
+    import json
+
+    from photonix.classifiers.face.model import FaceModel
+    from .factories import LibraryFactory, PhotoFactory, PhotoTagFactory, TagFactory
+
+    embeddings = {}
+    libraries = {}
+    for key in ['a', 'b']:
+        library = LibraryFactory()
+        libraries[key] = library
+        photo = PhotoFactory(library=library)
+        tag = TagFactory(library=library, name=f'Person {key}', type='F')
+        embedding = [float(ord(key))] * 128
+        embeddings[key] = embedding
+        PhotoTagFactory(photo=photo, tag=tag, source='C', confidence=1.0,
+                        extra_data=json.dumps({'facenet_embedding': embedding}))
+
+    model = FaceModel.__new__(FaceModel)  # Skip model download in __init__
+    model.library_id = str(libraries['a'].id)
+
+    os.makedirs(Path(settings.MODEL_DIR) / 'face', exist_ok=True)
+    model.retrain_face_similarity_index()
+
+    with open(Path(settings.MODEL_DIR) / 'face' / f'{model.library_id}_faces_tag_ids.json') as f:
+        tag_ids = json.loads(f.read())
+
+    expected_tag_ids = {str(t.id) for t in libraries['a'].tags.filter(type='F')}
+    assert set(tag_ids) == expected_tag_ids
+    assert len(tag_ids) == 1
+
+
 def test_face_predict():
     from photonix.classifiers.face.model import FaceModel
     from photonix.classifiers.face.deepface.commons.distance import findEuclideanDistance
