@@ -15,9 +15,8 @@ CLASSIFIERS = [
 # Classifiers that use lazy-loaded heavy dependencies (e.g. TensorFlow).
 # We call their ensure methods to verify those deps are also importable.
 LAZY_LOADERS = [
-    ('photonix.classifiers.object.model', '_ensure_tensorflow'),
+    ('photonix.classifiers.base_model', 'ensure_tensorflow'),
     ('photonix.classifiers.object.model', '_ensure_label_map_util'),
-    ('photonix.classifiers.style.model', '_ensure_tensorflow'),
     ('photonix.classifiers.face.model', '_ensure_face_libs'),
 ]
 

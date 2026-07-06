@@ -30,15 +30,9 @@ def django_db_modify_db_settings(django_db_modify_db_settings,):
 
 @pytest.fixture(autouse=True)
 def mock_redis(request):
-    mocks = ['photonix.classifiers.base_model.Lock',
-             'photonix.classifiers.style.model.Lock',
-             'photonix.classifiers.object.model.Lock']
-    mocks = [mock.patch(x, mock.MagicMock()) for x in mocks]
-    for m in mocks:
-        m.start()
-    yield
-    for m in mocks:
-        m.stop()
+    # All classifiers take their download/load locks via base_model
+    with mock.patch('photonix.classifiers.base_model.Lock', mock.MagicMock()):
+        yield
 
 
 @pytest.fixture(autouse=True)

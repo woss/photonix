@@ -2,7 +2,6 @@ import operator
 import sys
 from collections import defaultdict
 from colorsys import rgb_to_hsv
-from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageOps
@@ -91,24 +90,18 @@ class ColorModel:
         return score
 
 
+def save_tags(photo, results, model):
+    from photonix.classifiers.runners import get_or_create_tag
+    from photonix.photos.models import PhotoTag
+
+    for name, score in results:
+        tag = get_or_create_tag(library=photo.library, name=name, type='C', source='C', ordering=model.colors[name][1])
+        PhotoTag(photo=photo, tag=tag, source='C', confidence=score, significance=score).save()
+
+
 def run_on_photo(photo_id):
-    from photonix.classifiers.model_manager import get_model_manager
-
-    # Get or lazily load the model via ModelManager
-    model = get_model_manager().get_model('color', ColorModel)
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from photonix.classifiers.runners import results_for_model_on_photo, get_or_create_tag
-    photo, results = results_for_model_on_photo(model, photo_id)
-
-    if photo:
-        from photonix.photos.models import PhotoTag
-        photo.clear_tags(source='C', type='C')
-        for name, score in results:
-            tag = get_or_create_tag(library=photo.library, name=name, type='C', source='C', ordering=model.colors[name][1])
-            PhotoTag(photo=photo, tag=tag, source='C', confidence=score, significance=score).save()
-
-    return photo, results
+    from photonix.classifiers.runners import run_classifier_on_photo
+    return run_classifier_on_photo('color', ColorModel, photo_id, 'C', save_tags)
 
 
 if __name__ == '__main__':

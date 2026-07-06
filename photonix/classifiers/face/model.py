@@ -9,7 +9,6 @@ from random import randint
 from annoy import AnnoyIndex
 
 logger = logging.getLogger(__name__)
-from django.utils import timezone
 import numpy as np
 from PIL import Image, ImageOps
 from redis_lock import Lock
@@ -57,23 +56,17 @@ class FaceModel(BaseModel):
 
         self._graph_file = os.path.join(self.model_dir, graph_file)
         self._lock_name = lock_name
-        self._loaded = False
         self.graph = None
 
         # Download model files eagerly (cheap), but don't load into memory yet
         self.ensure_downloaded(lock_name=lock_name)
 
-    def _ensure_loaded(self):
-        """Lazy load the model on first use."""
-        if self._loaded:
-            return
-
+    def load(self):
         self.graph = self.load_graph(self._graph_file)
-        self._loaded = True
 
     def load_graph(self, graph_file):
         DeepFace, MTCNN, findEuclideanDistance, build_model = _ensure_face_libs()
-        with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name), expire=120, auto_renewal=True):
+        with self.load_lock():
             # Load MTCNN
             mtcnn_graph = None
             mtcnn_key = f'{self.graph_cache_key}:mtcnn'
@@ -328,7 +321,6 @@ def run_on_photo(photo_id):
             pass
 
     if photo:
-        from django.utils import timezone
         from photonix.photos.models import Tag, PhotoTag
 
         photo.clear_tags(source='C', type='F')
@@ -362,9 +354,6 @@ def run_on_photo(photo_id):
                 extra_data = json.dumps({'facenet_embedding': result['embedding']})
 
             PhotoTag(photo=photo, tag=tag, source='F', confidence=score, significance=score, position_x=x, position_y=y, size_x=width, size_y=height, model_version=model.version, retrained_model_version=model.retrained_version, extra_data=extra_data).save()
-        photo.classifier_color_completed_at = timezone.now()
-        photo.classifier_color_version = getattr(model, 'version', 0)
-        photo.save()
 
     return photo, results
 

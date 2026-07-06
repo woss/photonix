@@ -59,3 +59,27 @@ def results_for_model_on_photo(model, photo_id):
     else:
         results = model.predict(photo_id)
     return photo, results
+
+
+def run_classifier_on_photo(classifier_name, model_class, photo_id, tag_type,
+                            save_tags, has_results=None, model_kwargs=None):
+    """Shared template for classifier run_on_photo() implementations.
+
+    Fetches the model via the ModelManager, runs prediction, then (when given
+    a Photo rather than a bare file path) clears the classifier's previous
+    tags and calls save_tags(photo, results, model) to store the new ones.
+
+    has_results, if given, decides from the prediction results whether
+    existing tags should be replaced - e.g. style returns None for
+    unsupported file formats, which must not wipe previously created tags.
+    """
+    from photonix.classifiers.model_manager import get_model_manager
+
+    model = get_model_manager().get_model(classifier_name, model_class, **(model_kwargs or {}))
+    photo, results = results_for_model_on_photo(model, photo_id)
+
+    if photo and (has_results is None or has_results(results)):
+        photo.clear_tags(source='C', type=tag_type)
+        save_tags(photo, results, model)
+
+    return photo, results

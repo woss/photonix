@@ -18,11 +18,24 @@ graph_cache = {}
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded TensorFlow module, shared by all classifiers that need it
+tf = None
+
+
+def ensure_tensorflow():
+    """Lazy load TensorFlow on first use."""
+    global tf
+    if tf is None:
+        import tensorflow as _tf
+        tf = _tf
+    return tf
+
 
 class BaseModel:
     def __init__(self, model_dir=None):
         global graph_cache
         self.graph_cache = graph_cache
+        self._loaded = False
 
         if model_dir:
             self.model_dir = model_dir
@@ -36,6 +49,21 @@ class BaseModel:
     @property
     def graph_cache_key(self):
         return '{}:{}'.format(self.name, self.model_dir)
+
+    def _ensure_loaded(self):
+        """Lazy load the model on first use."""
+        if self._loaded:
+            return
+        self.load()
+        self._loaded = True
+
+    def load(self):
+        """Load the model into memory. Subclasses must implement this."""
+        raise NotImplementedError
+
+    def load_lock(self):
+        """Redis lock held while loading the model into the graph cache."""
+        return Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name), expire=120, auto_renewal=True)
 
     def get_model_info(self):
         from django.conf import settings

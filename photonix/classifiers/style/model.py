@@ -1,26 +1,10 @@
 import os
 import sys
-from pathlib import Path
 
 import numpy as np
 
-from redis_lock import Lock
-
-from photonix.classifiers.base_model import BaseModel
-from photonix.photos.utils.redis import redis_connection
+from photonix.classifiers.base_model import BaseModel, ensure_tensorflow as _ensure_tensorflow
 from photonix.web.utils import logger
-
-# Lazy-loaded modules (heavy imports)
-tf = None
-
-
-def _ensure_tensorflow():
-    """Lazy load TensorFlow on first use."""
-    global tf
-    if tf is None:
-        import tensorflow as _tf
-        tf = _tf
-    return tf
 
 
 GRAPH_FILE = os.path.join('style', 'graph.pb')
@@ -39,25 +23,19 @@ class StyleModel(BaseModel):
         self._graph_file = os.path.join(self.model_dir, graph_file)
         self._label_file = os.path.join(self.model_dir, label_file)
         self._lock_name = lock_name
-        self._loaded = False
         self.graph = None
         self.labels = None
 
         # Download model files eagerly (cheap), but don't load into memory yet
         self.ensure_downloaded(lock_name=lock_name)
 
-    def _ensure_loaded(self):
-        """Lazy load the model on first use."""
-        if self._loaded:
-            return
-
+    def load(self):
         self.graph = self.load_graph(self._graph_file)
         self.labels = self.load_labels(self._label_file)
-        self._loaded = True
 
     def load_graph(self, graph_file):
         tf = _ensure_tensorflow()
-        with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name), expire=120, auto_renewal=True):
+        with self.load_lock():
             if self.graph_cache_key in self.graph_cache:
                 return self.graph_cache[self.graph_cache_key]
 
@@ -140,24 +118,21 @@ class StyleModel(BaseModel):
             return None
 
 
+def save_tags(photo, results, model):
+    from photonix.classifiers.runners import get_or_create_tag
+    from photonix.photos.models import PhotoTag
+
+    for name, score in results:
+        tag = get_or_create_tag(library=photo.library, name=name, type='S', source='C')
+        PhotoTag(photo=photo, tag=tag, source='C', confidence=score, significance=score).save()
+
+
 def run_on_photo(photo_id):
-    from photonix.classifiers.model_manager import get_model_manager
-
-    # Get or lazily load the model via ModelManager
-    model = get_model_manager().get_model('style', StyleModel)
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from photonix.classifiers.runners import results_for_model_on_photo, get_or_create_tag
-    photo, results = results_for_model_on_photo(model, photo_id)
-
-    if photo and results is not None:
-        from photonix.photos.models import PhotoTag
-        photo.clear_tags(source='C', type='S')
-        for name, score in results:
-            tag = get_or_create_tag(library=photo.library, name=name, type='S', source='C')
-            PhotoTag(photo=photo, tag=tag, source='C', confidence=score, significance=score).save()
-
-    return photo, results
+    from photonix.classifiers.runners import run_classifier_on_photo
+    # results is None for file formats Tensorflow can't read - existing tags
+    # must be kept in that case, not cleared
+    return run_classifier_on_photo('style', StyleModel, photo_id, 'S', save_tags,
+                                   has_results=lambda results: results is not None)
 
 
 if __name__ == '__main__':
