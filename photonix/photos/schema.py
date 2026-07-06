@@ -882,16 +882,22 @@ class ImageAnalysis(graphene.Mutation):
         library_obj.classification_face_enabled = input.classification_face_enabled
         library_obj.save()
         user = User.objects.get(pk=input.user_id)
+        # Only auto-login as part of genuine first-run onboarding, i.e. when this
+        # user is completing image-analysis configuration for the very first time.
+        # Without this guard the mutation would grant a session for ANY user_id
+        # with no password on an already-configured instance (account takeover).
+        is_onboarding = not user.has_configured_image_analysis
         user.has_configured_image_analysis = True
         user.save()
-        # For make user login automatically from backend.
-        if not hasattr(user, 'backend'):
-            for backend in settings.AUTHENTICATION_BACKENDS:
-                if user == load_backend(backend).get_user(user.pk):
-                    user.backend = backend
-                    break
-        if hasattr(user, 'backend'):
-            login(info.context, user)
+        if is_onboarding:
+            # For make user login automatically from backend.
+            if not hasattr(user, 'backend'):
+                for backend in settings.AUTHENTICATION_BACKENDS:
+                    if user == load_backend(backend).get_user(user.pk):
+                        user.backend = backend
+                        break
+            if hasattr(user, 'backend'):
+                login(info.context, user)
         # Finish user login
         return ImageAnalysis(
             has_configured_image_analysis=user.has_configured_image_analysis,
