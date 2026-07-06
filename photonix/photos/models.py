@@ -19,6 +19,24 @@ LIBRARY_SETUP_STAGE_COMPLETED_CHOICES = (
 )
 
 
+class ForUserQuerySet(models.QuerySet):
+    """Scopes lookups to libraries the given user is a member of.
+
+    API resolvers must never look objects up by bare primary key - always go
+    through for_user() so one user can't read or mutate another's data.
+    """
+    user_path = 'library__users__user'
+
+    def for_user(self, user):
+        if user is None or user.is_anonymous:
+            return self.none()
+        return self.filter(**{self.user_path: user})
+
+
+class PhotoRelatedForUserQuerySet(ForUserQuerySet):
+    user_path = 'photo__library__users__user'
+
+
 class Library(UUIDModel, VersionedModel):
     name = models.CharField(max_length=128, help_text='Display name of the library')
     classification_color_enabled = models.BooleanField(default=False, help_text='Run color analysis on photos?')
@@ -91,6 +109,8 @@ class Camera(UUIDModel, VersionedModel):
     earliest_photo = models.DateTimeField()
     latest_photo = models.DateTimeField()
 
+    objects = ForUserQuerySet.as_manager()
+
     class Meta:
         unique_together = [['library', 'make', 'model']]
         ordering = ['make', 'model']
@@ -104,6 +124,8 @@ class Lens(UUIDModel, VersionedModel):
     name = models.CharField(max_length=128)
     earliest_photo = models.DateTimeField()
     latest_photo = models.DateTimeField()
+
+    objects = ForUserQuerySet.as_manager()
 
     class Meta:
         verbose_name_plural = 'lenses'
@@ -136,6 +158,8 @@ class Photo(UUIDModel, VersionedModel):
     preferred_photo_file = models.ForeignKey('PhotoFile', related_name='+', null=True, on_delete=models.SET_NULL)  # File selected by the user that is the best version to be used
     thumbnailed_version = models.PositiveIntegerField(default=0)  # Version from photos.utils.thumbnails.THUMBNAILER_VERSION at time of generating the required thumbnails declared in settings.THUMBNAIL_SIZES
     deleted = models.BooleanField(default=False)
+
+    objects = ForUserQuerySet.as_manager()
 
     class Meta:
         ordering = ['-taken_at']
@@ -230,6 +254,8 @@ class PhotoFile(UUIDModel, VersionedModel):
     exif_rotation = models.PositiveIntegerField(null=True, default=0)
     user_rotation = models.PositiveIntegerField(null=True, default=0)
 
+    objects = PhotoRelatedForUserQuerySet.as_manager()
+
     def __str__(self):
         return str(self.path)
 
@@ -270,6 +296,8 @@ class Tag(UUIDModel, VersionedModel):
     source = models.CharField(max_length=1, choices=SOURCE_CHOICES, db_index=True)
     ordering = models.FloatField(null=True)
 
+    objects = ForUserQuerySet.as_manager()
+
     class Meta:
         ordering = ['ordering', 'name']
         unique_together = [['library', 'name', 'type', 'source']]
@@ -296,6 +324,8 @@ class PhotoTag(UUIDModel, VersionedModel):
     # A place to store extra JSON data such as face feature positions for eyes, nose and mouth
     extra_data = models.TextField(null=True)
     deleted = models.BooleanField(default=False)
+
+    objects = PhotoRelatedForUserQuerySet.as_manager()
 
     class Meta:
         ordering = ['-significance']
