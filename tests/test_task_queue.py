@@ -87,6 +87,7 @@ def test_tasks_created_updated(photo_fixture_snow):
         assert child.status == 'S'
         child.complete()
         assert child.status == 'C'
+    task.refresh_from_db()
     assert task.status == 'C'
 
 
@@ -105,6 +106,34 @@ def test_task_claim_is_atomic(photo_fixture_snow):
     # The losing replica must skip the task rather than process it again
     ensure_raw_processed(task_b.subject_id, task_b)
     assert not Task.objects.filter(type='generate_thumbnails', subject_id=photo_fixture_snow.id).exists()
+
+
+def test_sibling_completion_creates_single_downstream_chain(db):
+    # A stale duplicate completion (e.g. two replicas racing) must not
+    # re-complete tasks or create a second downstream task chain
+    import uuid
+
+    library = LibraryFactory()
+    subject_id = uuid.uuid4()
+    parent = Task.objects.create(type='parent_task', subject_id=subject_id, complete_with_children=True, library=library)
+    child_a = Task.objects.create(type='child_task', subject_id=subject_id, parent=parent, library=library)
+    child_b = Task.objects.create(type='child_task', subject_id=subject_id, parent=parent, library=library)
+
+    # Copy of child_b as a concurrent process would have fetched it
+    stale_b = Task.objects.get(pk=child_b.pk)
+
+    child_a.complete(next_type='downstream_task', next_subject_id=subject_id)
+    parent.refresh_from_db()
+    assert parent.status == 'P'
+
+    child_b.complete(next_type='downstream_task', next_subject_id=subject_id)
+    parent.refresh_from_db()
+    assert parent.status == 'C'
+    assert Task.objects.filter(type='downstream_task').count() == 1
+
+    # Replaying the completion from the stale copy must be a no-op
+    stale_b.complete(next_type='downstream_task', next_subject_id=subject_id)
+    assert Task.objects.filter(type='downstream_task').count() == 1
 
 
 def test_processor_worker_survives_bad_task(monkeypatch):

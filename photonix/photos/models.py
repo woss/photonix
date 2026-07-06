@@ -353,10 +353,15 @@ class Task(UUIDModel, VersionedModel):
         return bool(claimed)
 
     def complete(self, next_type=None, next_subject_id=None):
-        # Set status of current task and queue up next task if appropriate
-        self.status = 'C'
-        self.finished_at = timezone.now()
-        self.save()
+        # Atomically transition to Completed. If another process completed
+        # this task already, do nothing - otherwise concurrent completions
+        # would each create their own downstream task chain.
+        now = timezone.now()
+        updated = Task.objects.filter(pk=self.pk).exclude(status='C').update(
+            status='C', finished_at=now, updated_at=now)
+        if not updated:
+            return
+        self.refresh_from_db()
 
         # Create next task in the chain if there should be one
         if not self.parent and next_type:
@@ -365,10 +370,11 @@ class Task(UUIDModel, VersionedModel):
         if self.parent and self.parent.complete_with_children:
             # If all siblings are complete, we should mark our parent as complete
             with transaction.atomic():
-                # select_for_update() will block if another process is working with these children
-                siblings = self.parent.children.select_for_update().filter(status='C')
-                if siblings.count() == self.parent.children.count():
-                    self.parent.complete(
+                # Lock the parent row so only one completing child at a time
+                # runs the all-siblings-complete check
+                parent = Task.objects.select_for_update().get(pk=self.parent_id)
+                if parent.status != 'C' and not parent.children.exclude(status='C').exists():
+                    parent.complete(
                         next_type=next_type, next_subject_id=next_subject_id)
 
     def failed(self, error=None, traceback=None):
