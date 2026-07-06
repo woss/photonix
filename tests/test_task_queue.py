@@ -140,6 +140,36 @@ def test_no_classifier_tasks_created_for_disabled_classifiers(db):
     assert task.status == 'C'
 
 
+def test_scheduler_processes_tasks_in_steady_state(db, monkeypatch):
+    # The scheduler must attempt processing on every poll - gating it on the
+    # remaining count changing meant pending tasks were never expanded once
+    # the count settled (steady state)
+    import uuid
+
+    from photonix.photos.management.commands import classification_scheduler
+
+    library = LibraryFactory()
+    Task.objects.create(type='classify_images', subject_id=uuid.uuid4(), library=library)
+
+    process_calls = []
+    monkeypatch.setattr(classification_scheduler, 'process_classify_images_tasks',
+                        lambda: process_calls.append(1))
+
+    def fake_sleep(seconds):
+        if len(process_calls) >= 3 or fake_sleep.iterations >= 5:
+            raise KeyboardInterrupt
+        fake_sleep.iterations += 1
+    fake_sleep.iterations = 0
+    monkeypatch.setattr(classification_scheduler, 'sleep', fake_sleep)
+
+    with pytest.raises(KeyboardInterrupt):
+        classification_scheduler.Command().run_scheduler()
+
+    # The pending count never changes across iterations so the old code
+    # would only have processed once
+    assert len(process_calls) >= 3
+
+
 def test_sibling_completion_creates_single_downstream_chain(db):
     # A stale duplicate completion (e.g. two replicas racing) must not
     # re-complete tasks or create a second downstream task chain
