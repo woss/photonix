@@ -92,7 +92,6 @@ const FiltersContainer = ({
   searchAreaExpand,
   setFilters,
 }) => {
-  const user = useSelector((state) => state.user) // Using user here from Redux store so we can wait for any JWT tokens to be refreshed before running GraphQL queries that require authentication
   const [isFiltersAvail, setIsFiltersAvail] = useState(false)
   const activeLibrary = useSelector(getActiveLibrary)
   let filterData = []
@@ -104,13 +103,9 @@ const FiltersContainer = ({
 
   let variables = {}
   variables = { libraryId: activeLibrary?.id, multiFilter: filtersStr }
-  const { loading, error, data, refetch } = useQuery(
-    GET_FILTERS,
-    {
-      variables: variables,
-    },
-    { skip: !user }
-  )
+  const { loading, error, data, refetch } = useQuery(GET_FILTERS, {
+    variables: variables,
+  })
 
   useEffect(() => {
     refetch()

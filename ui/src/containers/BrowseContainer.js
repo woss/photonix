@@ -98,7 +98,6 @@ const GET_ALBUMS = gql`
 const BrowseContainer = (props) => {
   const dispatch = useDispatch()
   const [isLibrarySet, setIsLibrarySet] = useState(false)
-  const user = useSelector((state) => state.user) // Using user here from Redux store so we can wait for any JWT tokens to be refreshed before running GraphQL queries that require authentication
   const activeLibrary = useSelector(getActiveLibrary)
   const [photoData, setPhotoData] = useState()
   const [isMapShowing, setIsMapShowing] = useState(false)
@@ -122,7 +121,7 @@ const BrowseContainer = (props) => {
     loading: librariesLoading,
     error: librariesError,
     data: librariesData,
-  } = useQuery(GET_LIBRARIES, { skip: !user })
+  } = useQuery(GET_LIBRARIES)
 
   useEffect(() => {
     if (librariesData && librariesData.allLibraries.length && !isLibrarySet) {
@@ -149,7 +148,7 @@ const BrowseContainer = (props) => {
     loading: profileLoading,
     error: profileError,
     data: profileData,
-  } = useQuery(GET_PROFILE, { skip: !user })
+  } = useQuery(GET_PROFILE)
 
   let photoSections = []
   let photos = []
@@ -202,7 +201,7 @@ const BrowseContainer = (props) => {
     variables: {
       filters: searchStr,
     },
-    skip: !user || !searchStr || !searchStr.includes('library_id:'),
+    skip: !searchStr || !searchStr.includes('library_id:'),
   })
   if (mapPhotosError) console.log(mapPhotosError)
 
