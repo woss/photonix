@@ -114,6 +114,25 @@ def test_style_predict():
     assert result == None
 
 
+def test_face_graph_cache_keys_match_unload_pattern():
+    # Cache keys must embed the real graph_cache_key so ModelManager's
+    # unload can find and free them - literal '{self.graph_cache_key}'
+    # strings meant idle-unload freed nothing
+    from photonix.classifiers.face.model import FaceModel
+    from photonix.classifiers.model_manager import get_model_manager
+
+    model = FaceModel()
+    model._ensure_loaded()
+
+    assert f'{model.graph_cache_key}:mtcnn' in model.graph_cache
+    assert f'{model.graph_cache_key}:facenet' in model.graph_cache
+    face_keys = [k for k in model.graph_cache if k.startswith('face:')]
+    assert len(face_keys) == 2
+
+    get_model_manager()._clear_graph_cache('face', model)
+    assert not [k for k in model.graph_cache if k.startswith('face:')]
+
+
 def test_face_similarity_index_trained_per_library(db):
     # The ANN index files are saved per-library so they must only be
     # trained on that library's faces

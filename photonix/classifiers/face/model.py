@@ -76,7 +76,7 @@ class FaceModel(BaseModel):
         with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name), expire=120, auto_renewal=True):
             # Load MTCNN
             mtcnn_graph = None
-            mtcnn_key = '{self.graph_cache_key}:mtcnn'
+            mtcnn_key = f'{self.graph_cache_key}:mtcnn'
             if mtcnn_key in self.graph_cache:
                 mtcnn_graph = self.graph_cache[mtcnn_key]
             else:
@@ -85,7 +85,7 @@ class FaceModel(BaseModel):
 
             # Load Facenet
             facenet_graph = None
-            facenet_key = '{self.graph_cache_key}:facenet'
+            facenet_key = f'{self.graph_cache_key}:facenet'
             if facenet_key in self.graph_cache:
                 facenet_graph = self.graph_cache[facenet_key]
             else:
