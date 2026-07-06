@@ -11,13 +11,24 @@ os.environ['ENV'] = 'test'
 
 
 if __name__ == '__main__':
-    pytest_args = ['tests']
-    if len(sys.argv) > 1:
-        pytest_args = sys.argv[1:]
-        if not pytest_args[0].startswith('tests/'):
-            pytest_args[0] = 'tests/' + pytest_args[0]
-        if not pytest_args[0].endswith('.py'):
-            pytest_args[0] = pytest_args[0] + '.py'
+    pytest_args = []
+    has_target = False
+    for arg in sys.argv[1:]:
+        # Pass pytest options like -k/-x and their values straight through;
+        # expand bare test module names like 'test_metadata' as a convenience
+        if not arg.startswith('-'):
+            if '/' in arg:
+                has_target = True
+            else:
+                path, sep, rest = arg.partition('::')
+                if not path.endswith('.py'):
+                    path += '.py'
+                if (Path(__file__).parent / 'tests' / path).exists():
+                    arg = 'tests/' + path + sep + rest
+                    has_target = True
+        pytest_args.append(arg)
+    if not has_target:
+        pytest_args.append('tests')
 
     cov = None
     if os.environ.get('COVERAGE'):

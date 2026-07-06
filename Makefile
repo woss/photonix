@@ -28,8 +28,9 @@ shell:
 shell-prd:
 	$(DOCKER_COMPOSE_PRD) exec photonix bash
 
+# Usage: make manage ARGS="migrate"
 manage:
-	$(DOCKER_COMPOSE_DEV) exec photonix python photonix/manage.py ${}
+	$(DOCKER_COMPOSE_DEV) exec photonix python photonix/manage.py $(ARGS)
 
 test:
 	$(DOCKER_COMPOSE_DEV) run -e PYTHONDONTWRITEBYTECODE=1 --rm photonix python test.py
