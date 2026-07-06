@@ -24,6 +24,23 @@ def photo_fixture_tree(db):
     return record_photo(tree_path, library)
 
 
+def test_get_or_create_tag_existing_with_different_parent(db):
+    # A tag that already exists with a different parent/ordering must be
+    # returned rather than attempting an INSERT that violates the
+    # (library, name, type, source) unique constraint and retrying forever
+    from photonix.classifiers.runners import get_or_create_tag
+    from photonix.photos.models import Tag
+
+    library = LibraryFactory()
+    parent = Tag.objects.create(library=library, name='Greece', type='L', source='C')
+    tag = get_or_create_tag(library=library, name='Athens', type='L', source='C', parent=parent)
+    assert tag.parent == parent
+
+    tag2 = get_or_create_tag(library=library, name='Athens', type='L', source='C', parent=None, ordering=5)
+    assert tag2 == tag
+    assert Tag.objects.filter(library=library, name='Athens', type='L', source='C').count() == 1
+
+
 def test_color_via_runner(photo_fixture_snow):
     from photonix.classifiers.color.model import run_on_photo
 

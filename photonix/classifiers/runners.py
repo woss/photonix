@@ -1,21 +1,24 @@
 import os
 import re
-from time import sleep
 from uuid import UUID
 
 
 def get_or_create_tag(library, name, type, source, parent=None, ordering=None):
-    # get_or_create is not atomic so an instance could get created by another thread inbetween.
-    # This causes an IntegrityError due to the unique_together constraint.
+    # Only look up by the fields in the unique_together constraint
+    # (library, name, type, source) - including parent/ordering in the lookup
+    # would attempt to create a duplicate row and fail forever with an
+    # IntegrityError whenever a matching tag exists with a different parent
+    # or ordering.
     from django.db import IntegrityError
     from photonix.photos.models import Tag
 
-    while True:
-        try:
-            tag, _ = Tag.objects.get_or_create(library=library, name=name, type=type, source=source, parent=parent, ordering=ordering)
-            break
-        except IntegrityError:
-            sleep(1)
+    try:
+        tag, _ = Tag.objects.get_or_create(
+            library=library, name=name, type=type, source=source,
+            defaults={'parent': parent, 'ordering': ordering})
+    except IntegrityError:
+        # Another thread created the same tag between our get and create
+        tag = Tag.objects.get(library=library, name=name, type=type, source=source)
     return tag
 
 
