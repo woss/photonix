@@ -149,5 +149,9 @@ class Mutation(graphene.ObjectType):
     verify_token = graphql_jwt.Verify.Field()
     refresh_token = graphql_jwt.Refresh.Field()
     revoke_token = graphql_jwt.Revoke.Field()
+    # Allow logout to clear the httpOnly JWT (access) and refresh-token cookies
+    # that the browser cannot remove itself.
+    delete_token_cookie = graphql_jwt.DeleteJSONWebTokenCookie.Field()
+    delete_refresh_token_cookie = graphql_jwt.DeleteRefreshTokenCookie.Field()
     create_user = CreateUser.Field()
     change_password = ChangePassword.Field()

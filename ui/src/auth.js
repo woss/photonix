@@ -1,7 +1,12 @@
 import history from './history'
 import Cookies from 'js-cookie'
 
-import { store } from './components/Init'
+import { store, client } from './components/Init'
+
+// The refresh-token cookie is only sent over HTTPS in production; on a plaintext
+// dev/localhost origin the Secure flag would prevent the browser storing it.
+const COOKIE_SECURE =
+  typeof window !== 'undefined' && window.location.protocol === 'https:'
 
 const TOKEN_EXPIRY_PREEMPT = 2 * 60 * 1000 // Refresh token this many milliseconds before expiry time
 const DEFAULT_REFRESH_INTERVAL = 3 * 1000 // Only used on first login, when we don't get given an expiry time (ms)
@@ -48,10 +53,16 @@ export const refreshToken = () => {
     })
     .then((response) => {
       if (response.data && response.data.refreshToken) {
+        // If the user logged out while this refresh was in flight, don't
+        // re-establish their session with the rotated token.
+        if (!loggedIn) {
+          return false
+        }
         // We got token and refreshToken
         Cookies.set('refreshToken', response.data.refreshToken.refreshToken, {
           expires: 365,
           sameSite: 'strict',
+          secure: COOKIE_SECURE,
         })
         store.dispatch({
           type: 'USER_CHANGED',
@@ -99,10 +110,12 @@ export const refreshToken = () => {
     })
 }
 
-export const scheduleTokenRefresh = (timeout) => {
-  // timeout is ms until next refresh attempt
+export const scheduleTokenRefresh = (delay) => {
+  // delay is ms until next refresh attempt
   // Note that old refresh token will be automatically revoked by Django signal (one time use)
-  let nextRefresh = timeout ? timeout : DEFAULT_REFRESH_INTERVAL
+  // Assign to the module-level `timeout` (not a shadowing parameter) so logOut's
+  // clearTimeout can actually cancel the pending refresh.
+  let nextRefresh = delay ? delay : DEFAULT_REFRESH_INTERVAL
   console.log('Next token refresh in ' + nextRefresh + 'ms')
   timeout = setTimeout(refreshToken, nextRefresh)
 }
@@ -146,9 +159,30 @@ export const logIn = (refreshToken) => {
     Cookies.set('refreshToken', refreshToken, {
       expires: 365,
       sameSite: 'strict',
+      secure: COOKIE_SECURE,
     })
   }
   loggedIn = true
+}
+
+export const deleteAuthCookies = () => {
+  // Ask the server to clear the httpOnly JWT (access) and refresh-token cookies
+  // that JavaScript cannot remove on its own.
+  fetch('/graphql', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRFToken': Cookies.get('csrftoken') || '',
+    },
+    body: JSON.stringify({
+      query: `mutation {
+  deleteTokenCookie { deleted }
+  deleteRefreshTokenCookie { deleted }
+}`,
+    }),
+  }).catch(() => {})
 }
 
 export const logOut = () => {
@@ -158,7 +192,14 @@ export const logOut = () => {
     revokeRefreshToken(oldToken)
     Cookies.remove('refreshToken')
   }
+  // Clear the server-set httpOnly auth cookies.
+  deleteAuthCookies()
   if (timeout) {
     clearTimeout(timeout)
+  }
+  // Drop any private data cached in memory so it cannot leak to the next
+  // person who uses this browser session.
+  if (client) {
+    client.clearStore().catch(() => {})
   }
 }

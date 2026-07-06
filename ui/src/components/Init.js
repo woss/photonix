@@ -76,7 +76,7 @@ const additiveLink = from([
   }),
 ])
 
-const client = new ApolloClient({
+export const client = new ApolloClient({
   cache: new InMemoryCache(),
   link: additiveLink,
 })
