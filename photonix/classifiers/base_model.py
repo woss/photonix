@@ -39,7 +39,7 @@ class BaseModel:
 
     def get_model_info(self):
         from django.conf import settings
-        response = requests.get(settings.MODEL_INFO_URL)
+        response = requests.get(settings.MODEL_INFO_URL, timeout=30)
         models_info = json.loads(response.content)
         model_info = models_info[self.name][str(self.version)]
         return model_info
@@ -67,7 +67,9 @@ class BaseModel:
         if not lock_name:
             lock_name = 'classifier_{}_download'.format(self.name)
 
-        with Lock(redis_connection, lock_name):
+        # auto_renewal keeps the lock alive while we hold it but lets it
+        # expire if this process is killed, instead of deadlocking forever
+        with Lock(redis_connection, lock_name, expire=120, auto_renewal=True):
             # First check if version file matches AND all files exist
             try:
                 with open(version_file) as f:
@@ -94,7 +96,7 @@ class BaseModel:
                     index = random.choice(range(len(locations)))
                     location = locations.pop(index)
                     hash_sha256 = hashlib.sha256()
-                    request = requests.get(location, stream=True)
+                    request = requests.get(location, stream=True, timeout=30)
 
                     if request.status_code != 200:
                         error = True

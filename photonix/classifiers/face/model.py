@@ -73,7 +73,7 @@ class FaceModel(BaseModel):
 
     def load_graph(self, graph_file):
         DeepFace, MTCNN, findEuclideanDistance, build_model = _ensure_face_libs()
-        with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name)):
+        with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name), expire=120, auto_renewal=True):
             # Load MTCNN
             mtcnn_graph = None
             mtcnn_key = '{self.graph_cache_key}:mtcnn'
@@ -151,7 +151,7 @@ class FaceModel(BaseModel):
             embedding_size = 128  # FaceNet output size
             t = AnnoyIndex(embedding_size, 'euclidean')
             # Ensure ANN index, tag IDs and version files can't be updated while we are reading
-            with Lock(redis_connection, 'face_model_retrain'):
+            with Lock(redis_connection, 'face_model_retrain', expire=60, auto_renewal=True):
                 self.reload_retrained_model_version()
                 t.load(str(ann_path))
                 with open(tag_ids_path) as f:
@@ -246,7 +246,7 @@ class FaceModel(BaseModel):
         t.build(3)  # Number of random forest trees
 
         # Aquire lock to save ANN, tag IDs and version files atomically
-        with Lock(redis_connection, 'face_model_retrain'):
+        with Lock(redis_connection, 'face_model_retrain', expire=60, auto_renewal=True):
             # Save ANN index
             t.save(str(ann_path))
 

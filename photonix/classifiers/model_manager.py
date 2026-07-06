@@ -231,8 +231,10 @@ class ModelManager:
                 return self._model_instances[classifier_name]
 
         # Slow path: need to load the model (with Redis lock for multi-process safety)
+        # auto_renewal keeps the lock alive while we hold it but lets it
+        # expire if this process is killed, instead of deadlocking forever
         lock_name = f'model_manager_{classifier_name}'
-        with Lock(redis_connection, lock_name):
+        with Lock(redis_connection, lock_name, expire=300, auto_renewal=True):
             # Double-check after acquiring lock
             with self._state_lock:
                 if classifier_name in self._model_instances:
@@ -303,7 +305,7 @@ class ModelManager:
             True if model was unloaded, False if it wasn't loaded.
         """
         lock_name = f'model_manager_{classifier_name}'
-        with Lock(redis_connection, lock_name):
+        with Lock(redis_connection, lock_name, expire=300, auto_renewal=True):
             with self._state_lock:
                 if classifier_name not in self._model_instances:
                     return False

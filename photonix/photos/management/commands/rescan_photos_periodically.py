@@ -28,7 +28,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             while True:
-                with Lock(redis_connection, 'rescan_photos'):
+                with Lock(redis_connection, 'rescan_photos', expire=300, auto_renewal=True):
                     self.rescan_photos(options['paths'])
                 sleep(60 * 60)  # Sleep for an hour
         except KeyboardInterrupt:

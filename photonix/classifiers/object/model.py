@@ -66,7 +66,7 @@ class ObjectModel(BaseModel):
 
     def load_graph(self, graph_file):
         tf = _ensure_tensorflow()
-        with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name)):
+        with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name), expire=120, auto_renewal=True):
             if self.graph_cache_key in self.graph_cache:
                 return self.graph_cache[self.graph_cache_key]
 
