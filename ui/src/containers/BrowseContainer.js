@@ -182,19 +182,14 @@ const BrowseContainer = (props) => {
     data: photosData,
     refetch,
     fetchMore: fetchMorePhotos,
-  } = useQuery(
-    GET_PHOTOS,
-    {
-      variables: {
-        filters: albumTagFilterStr || searchStr,
-        after: '',
-        first: PHOTO_PER_PAGE,
-      },
+  } = useQuery(GET_PHOTOS, {
+    variables: {
+      filters: albumTagFilterStr || searchStr,
+      after: '',
+      first: PHOTO_PER_PAGE,
     },
-    {
-      skip: !isLibrarySet,
-    }
-  )
+    skip: !isLibrarySet,
+  })
   if (photosError) {
     console.log('photosError', photosError)
   }
@@ -249,20 +244,15 @@ const BrowseContainer = (props) => {
     error: albumError,
     data: albumsData,
     refetch: refetchAlbumList,
-  } = useQuery(
-    GET_ALBUMS,
-    {
-      variables: {
-        libraryId: activeLibrary && activeLibrary.id,
-        name_Icontains: props.search || null,
-        after: '',
-        first: PHOTO_PER_PAGE,
-      },
+  } = useQuery(GET_ALBUMS, {
+    variables: {
+      libraryId: activeLibrary && activeLibrary.id,
+      name_Icontains: props.search || null,
+      after: '',
+      first: PHOTO_PER_PAGE,
     },
-    {
-      skip: !isLibrarySet,
-    }
-  )
+    skip: !isLibrarySet,
+  })
 
   albumError && console.log('albumError', albumError)
   useEffect(() => {

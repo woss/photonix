@@ -190,21 +190,17 @@ const PhotoDetail = ({
   //   }
   // }, [showMetadata])
 
-  const { data: photosData, fetchMore: fetchMorePhotos } = useQuery(
-    GET_PHOTOS,
-    {
-      variables: {
-        filters: '',
-        id: photoId,
-        first: 1,
-        last: null,
-        after: '',
-      },
+  // This query must run eagerly: fetchNextPreviousPhoto reads
+  // photosData.allPhotos.pageInfo before paginating with fetchMore
+  const { data: photosData, fetchMore: fetchMorePhotos } = useQuery(GET_PHOTOS, {
+    variables: {
+      filters: '',
+      id: photoId,
+      first: 1,
+      last: null,
+      after: '',
     },
-    {
-      skip: true,
-    }
-  )
+  })
 
   const updatePhotosStore = useCallback(
     (data) => {
