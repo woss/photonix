@@ -1,3 +1,5 @@
+import threading
+import time
 from pathlib import Path
 
 from django.utils import timezone
@@ -86,3 +88,43 @@ def test_tasks_created_updated(photo_fixture_snow):
         child.complete()
         assert child.status == 'C'
     assert task.status == 'C'
+
+
+def test_processor_worker_survives_bad_task(monkeypatch):
+    # A task that raises during processing must not kill the worker thread and
+    # must still call q.task_done() so the dispatch loop's q.join() can return
+    from photonix.photos.management.commands import raw_processor, thumbnail_processor
+
+    class StubTask:
+        subject_id = 'poisoned'
+        id = 'stub-task-id'
+
+        def __init__(self):
+            self.marked_failed = False
+
+        def failed(self):
+            self.marked_failed = True
+
+    def raise_error(subject_id, task):
+        raise ValueError('simulated corrupt file')
+
+    for module, processing_func in [
+        (thumbnail_processor, 'generate_thumbnails_for_photo'),
+        (raw_processor, 'process_raw_task'),
+    ]:
+        monkeypatch.setattr(module, processing_func, raise_error)
+        task = StubTask()
+        thread = threading.Thread(target=module.worker, daemon=True)
+        thread.start()
+        module.q.put(task)
+
+        # Equivalent to q.join() but fails rather than deadlocks on regression
+        deadline = time.time() + 10
+        while module.q.unfinished_tasks and time.time() < deadline:
+            time.sleep(0.05)
+        assert module.q.unfinished_tasks == 0
+
+        assert task.marked_failed
+        module.q.put(None)  # Shut worker down cleanly
+        thread.join(timeout=5)
+        assert not thread.is_alive()
