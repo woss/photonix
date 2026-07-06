@@ -1,25 +1,73 @@
 import os
-import time
-from datetime import datetime
 from pathlib import Path
 
 from django.conf import settings
 from PIL import Image
 
 
-def test_downloading(tmpdir):
+def test_downloading(tmpdir, monkeypatch):
+    # Exercises the whole download path (info JSON, hash verification, file
+    # placement, version.txt) against a faked HTTP layer so the test works
+    # offline and doesn't pull hundreds of megabytes
+    import hashlib
+    import json
+
+    from photonix.classifiers import base_model
     from photonix.classifiers.style.model import StyleModel
 
-    model_dir = tmpdir
-    start = time.mktime(datetime.now().timetuple())
-    model = StyleModel(lock_name=None, model_dir=model_dir)
+    graph_bytes = b'fake-tensorflow-graph-bytes' * 1024
+    labels_bytes = b'fake\nlabels\n'
+    model_info = {
+        'style': {
+            str(StyleModel.version): {
+                'files': [
+                    {
+                        'filename': 'graph.pb',
+                        'locations': ['https://models.invalid/style/graph.pb'],
+                        'sha256': hashlib.sha256(graph_bytes).hexdigest(),
+                    },
+                    {
+                        'filename': 'labels.txt',
+                        'locations': ['https://models.invalid/style/labels.txt'],
+                        'sha256': hashlib.sha256(labels_bytes).hexdigest(),
+                    },
+                ]
+            }
+        }
+    }
+    payloads = {
+        settings.MODEL_INFO_URL: json.dumps(model_info).encode(),
+        'https://models.invalid/style/graph.pb': graph_bytes,
+        'https://models.invalid/style/labels.txt': labels_bytes,
+    }
 
-    graph_path = str(Path(model_dir) / 'style' / 'graph.pb')
-    assert os.stat(graph_path).st_size > 1024 * 10 * 10
-    assert os.stat(graph_path).st_mtime > start
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, content):
+            self.content = content
+
+        def iter_content(self, chunk_size=None):
+            yield self.content
+
+    monkeypatch.setattr(base_model.requests, 'get',
+                        lambda url, **kwargs: FakeResponse(payloads[url]))
+
+    model_dir = tmpdir.mkdir('good')
+    model = StyleModel(lock_name=None, model_dir=str(model_dir))
+
+    assert (Path(model_dir) / 'style' / 'graph.pb').read_bytes() == graph_bytes
+    assert (Path(model_dir) / 'style' / 'labels.txt').read_bytes() == labels_bytes
     with open(str(Path(model_dir) / 'style' / 'version.txt')) as f:
-        content = f.read()
-        assert content.strip() == str(model.version)
+        assert f.read().strip() == str(model.version)
+
+    # A corrupted download (hash mismatch) must install neither the file nor
+    # the version marker, so the next run retries the download
+    payloads['https://models.invalid/style/graph.pb'] = b'tampered-content'
+    bad_dir = tmpdir.mkdir('bad')
+    StyleModel(lock_name=None, model_dir=str(bad_dir))
+    assert not (Path(bad_dir) / 'style' / 'graph.pb').exists()
+    assert not (Path(bad_dir) / 'style' / 'version.txt').exists()
 
 
 def test_color_predict():
