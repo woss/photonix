@@ -67,6 +67,34 @@ def test_datetime():
 
 
 @pytest.mark.django_db
+def test_record_photo_delete_event_for_missing_file():
+    """DELETE/MOVED_FROM events arrive after the file is gone from disk so
+    record_photo must not attempt to read it (P1.2)."""
+    library = LibraryFactory()
+    missing_path = '/data/photos/does-not-exist.jpg'
+    assert record_photo(missing_path, library, 'DELETE') is True
+    assert record_photo(missing_path, library, 'MOVED_FROM') is True
+
+
+@pytest.mark.django_db
+def test_record_photo_delete_event_removes_record():
+    from photonix.photos.models import Photo, PhotoFile
+
+    library = LibraryFactory()
+    snow_path = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = os.path.join(tmp_dir, 'snow.jpg')
+        shutil.copy2(snow_path, path)
+        photo = record_photo(path, library)
+        assert PhotoFile.objects.filter(path=path).exists()
+
+        os.remove(path)
+        assert record_photo(path, library, 'DELETE') is True
+        assert not PhotoFile.objects.filter(path=path).exists()
+        assert not Photo.objects.filter(id=photo.id).exists()
+
+
+@pytest.mark.django_db
 def test_duplicate_date_photos():
     """Photos with same date should not be treated as duplicates (fix #347)."""
     library = LibraryFactory()

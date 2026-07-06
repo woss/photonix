@@ -25,26 +25,30 @@ MIMETYPE_WHITELIST = [
 
 
 def record_photo(path, library, inotify_event_type=None):
+    if type(library) == Library:
+        library_id = library.id
+    else:
+        library_id = str(library)
+
+    # Handle deletions before anything that reads the file - it is already
+    # gone from disk so any filesystem access would raise FileNotFoundError
+    if inotify_event_type in ['DELETE', 'MOVED_FROM']:
+        try:
+            photo_file = PhotoFile.objects.get(path=path)
+        except PhotoFile.DoesNotExist:
+            return True
+        return delete_photo_record(photo_file)
+
     mimetype = get_mimetype(path)
 
     if not imghdr.what(path) and not mimetype in MIMETYPE_WHITELIST and subprocess.run(['dcraw', '-i', path]).returncode:
         logger.error(f'File is not a supported type: {path} ({mimetype})')
         return None
 
-    if type(library) == Library:
-        library_id = library.id
-    else:
-        library_id = str(library)
     try:
         photo_file = PhotoFile.objects.get(path=path)
     except PhotoFile.DoesNotExist:
         photo_file = PhotoFile()
-
-    if inotify_event_type in ['DELETE', 'MOVED_FROM']: 
-        if PhotoFile.objects.filter(path=path).exists():
-            return delete_photo_record(photo_file)
-        else:
-            return True
 
     file_modified_at = datetime.fromtimestamp(os.stat(path).st_mtime, tz=utc)
 
