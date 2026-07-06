@@ -36,8 +36,8 @@ def test_tasks_created_updated(photo_fixture_snow):
     assert task.started_at == None
     assert task.finished_at == None
 
-    # Test manually starting makes intended changes
-    task.start()
+    # Test claiming makes intended changes
+    assert task.claim()
     assert task.status == 'S'
     assert (timezone.now() - task.started_at).seconds < 1
 
@@ -88,13 +88,32 @@ def test_tasks_created_updated(photo_fixture_snow):
     # Completing all the child processes should set the parent task to completed
     for child in task.children.all():
         assert child.status == 'P'
-        child.start()
+        assert child.claim()
         assert task.status == 'S'
         assert child.status == 'S'
         child.complete()
         assert child.status == 'C'
     task.refresh_from_db()
     assert task.status == 'C'
+
+
+def test_failed_transition_is_atomic_and_never_clobbers_completion(db):
+    # A claimed task can be marked Failed
+    task = _make_task(type='generate_thumbnails')
+    assert task.claim()
+    task.failed()
+    assert task.status == 'F'
+    assert task.finished_at is not None
+
+    # A concurrently Completed task must stay Completed - e.g. a slow worker
+    # calling failed() after a requeued copy of the task already finished
+    task = _make_task(type='generate_thumbnails')
+    stale_copy = Task.objects.get(pk=task.pk)
+    task.complete()
+    assert task.status == 'C'
+    stale_copy.failed('worker gave up late')
+    stale_copy.refresh_from_db()
+    assert stale_copy.status == 'C'
 
 
 def test_task_claim_is_atomic(photo_fixture_snow):

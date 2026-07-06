@@ -363,11 +363,6 @@ class Task(UUIDModel, VersionedModel):
     def __str__(self):
         return '{}: {}'.format(self.type, self.created_at)
 
-    def start(self):
-        self.status = 'S'
-        self.started_at = timezone.now()
-        self.save()
-
     def claim(self):
         """Atomically claim a Pending task for processing.
 
@@ -408,9 +403,13 @@ class Task(UUIDModel, VersionedModel):
                         next_type=next_type, next_subject_id=next_subject_id)
 
     def failed(self, error=None, traceback=None):
-        self.status = 'F'
-        self.finished_at = timezone.now()
-        self.save()
+        # Atomically transition to Failed. Never clobber a concurrent
+        # completion - a task that already Completed stays Completed.
+        now = timezone.now()
+        updated = Task.objects.filter(pk=self.pk).exclude(status='C').update(
+            status='F', finished_at=now, updated_at=now)
+        if updated:
+            self.refresh_from_db()
 
         if error:
             logger.error(error)
