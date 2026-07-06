@@ -34,7 +34,8 @@ def ensure_raw_processing_tasks():
 
 
 def ensure_raw_processed(photo_id, task):
-    task.start()
+    if not task.claim():
+        return  # Another processor replica claimed this task first
     photo = Photo.objects.get(id=photo_id)
     has_raw_photos = False
 
@@ -56,7 +57,8 @@ def process_raw_tasks():
 
 
 def process_raw_task(photo_file_id, task):
-    task.start()
+    if not task.claim():
+        return  # Another processor replica claimed this task first
     photo_file = PhotoFile.objects.get(id=photo_file_id)
     output_path, version, process_params, external_version = generate_jpeg(photo_file.path)
 

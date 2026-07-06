@@ -31,7 +31,8 @@ def process_classify_images_tasks():
 
 
 def generate_classifier_tasks_for_photo(photo_id, task):
-    task.start()
+    if not task.claim():
+        return  # Another processor replica claimed this task first
 
     # Add task for each classifier on current photo
     with transaction.atomic():
@@ -106,7 +107,8 @@ class ThreadedQueueProcessor:
         from photonix.classifiers.model_manager import InsufficientMemoryError
 
         try:
-            task.start()
+            if not task.claim():
+                return  # Another processor replica claimed this task first
 
             # Touch the model to reset idle timer before processing
             if self._use_lazy_loading and self._model_manager:

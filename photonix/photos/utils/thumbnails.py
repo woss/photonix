@@ -21,7 +21,8 @@ def process_generate_thumbnails_tasks():
 
 
 def generate_thumbnails_for_photo(photo, task):
-    task.start()
+    if not task.claim():
+        return  # Another processor replica claimed this task first
 
     if not isinstance(photo, Photo):
         try:

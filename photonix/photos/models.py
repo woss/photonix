@@ -338,6 +338,20 @@ class Task(UUIDModel, VersionedModel):
         self.started_at = timezone.now()
         self.save()
 
+    def claim(self):
+        """Atomically claim a Pending task for processing.
+
+        Uses a conditional UPDATE so that when several processor replicas
+        fetch the same Pending task, only one of them wins the claim and
+        the others skip it. Returns True if this caller claimed the task.
+        """
+        now = timezone.now()
+        claimed = Task.objects.filter(pk=self.pk, status='P').update(
+            status='S', started_at=now, updated_at=now)
+        if claimed:
+            self.refresh_from_db()
+        return bool(claimed)
+
     def complete(self, next_type=None, next_subject_id=None):
         # Set status of current task and queue up next task if appropriate
         self.status = 'C'

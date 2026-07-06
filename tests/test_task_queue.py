@@ -90,6 +90,23 @@ def test_tasks_created_updated(photo_fixture_snow):
     assert task.status == 'C'
 
 
+def test_task_claim_is_atomic(photo_fixture_snow):
+    from photonix.photos.utils.raw import ensure_raw_processed
+
+    # Two processor replicas fetch the same Pending task - only one may win
+    task_a = Task.objects.get(type='ensure_raw_processed', subject_id=photo_fixture_snow.id)
+    task_b = Task.objects.get(pk=task_a.pk)
+
+    assert task_a.claim() is True
+    assert task_a.status == 'S'
+    assert task_a.started_at is not None
+    assert task_b.claim() is False
+
+    # The losing replica must skip the task rather than process it again
+    ensure_raw_processed(task_b.subject_id, task_b)
+    assert not Task.objects.filter(type='generate_thumbnails', subject_id=photo_fixture_snow.id).exists()
+
+
 def test_processor_worker_survives_bad_task(monkeypatch):
     # A task that raises during processing must not kill the worker thread and
     # must still call q.task_done() so the dispatch loop's q.join() can return
