@@ -45,6 +45,11 @@ class ColorModel:
         # This handles all 8 EXIF orientation cases (including mirrored/flipped)
         image = ImageOps.exif_transpose(image)
 
+        # Grayscale images have no channel axis (crashes below) and
+        # CMYK/palette pixel values aren't comparable to RGB targets
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+
         image = image.resize((image_size, image_size), Image.Resampling.BICUBIC)
         pixels = np.asarray(image)
         pixels = [j for i in pixels for j in i]
@@ -74,7 +79,12 @@ class ColorModel:
         # Colors are list of 3 floats (RGB) from 0.0 to 1.0
         a_h, a_s, a_v = rgb_to_hsv(a[0] / 255, a[1] / 255, a[2] / 255)
         b_h, b_s, b_v = rgb_to_hsv(b[0] / 255, b[1] / 255, b[2] / 255)
-        diff_h = 1 - abs(a_h - b_h)  # Hue is more highly weighted than saturation and value
+        # Hue is circular so wrap the distance around (e.g. two reds at
+        # hues 0.99 and 0.01 are 0.02 apart, not 0.98)
+        dist_h = abs(a_h - b_h)
+        if dist_h > 0.5:
+            dist_h = 1 - dist_h
+        diff_h = 1 - dist_h  # Hue is more highly weighted than saturation and value
         diff_s = 1 - abs(a_s - b_s) * 0.5
         diff_v = 1 - abs(a_v - b_v) * 0.25
         score = diff_h * diff_s * diff_v

@@ -23,14 +23,50 @@ def test_downloading(tmpdir):
 
 
 def test_color_predict():
+    from PIL import Image
+
     from photonix.classifiers.color.model import ColorModel
 
     model = ColorModel()
     snow = str(Path(__file__).parent / 'photos' / 'snow.jpg')
     result = model.predict(snow)
-    expected = [('Azure', '0.891'), ('White', '0.032'), ('Gray', '0.021'), ('Red', '0.018'), ('Magenta', '0.014'), ('Purple', '0.009'), ('Turquoise', '0.008'), ('Orchid', '0.008')]
+    expected = [('Azure', '0.826'), ('Gray', '0.106'), ('White', '0.038'), ('Black', '0.021'), ('Turquoise', '0.008')]
     actual = [(x, '{:.3f}'.format(y)) for x, y in result]
     assert expected == actual
+
+
+def test_color_predict_non_rgb_modes(tmpdir):
+    # Grayscale used to crash with IndexError and CMYK pixel channels were
+    # compared to RGB targets without conversion
+    from PIL import Image
+
+    from photonix.classifiers.color.model import ColorModel
+
+    model = ColorModel()
+    snow = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+
+    grayscale_path = str(Path(tmpdir) / 'gray.jpg')
+    Image.open(snow).convert('L').save(grayscale_path)
+    result = dict(model.predict(grayscale_path))
+    assert result
+    assert set(result.keys()) <= {'Gray', 'Black', 'White'}
+
+    cmyk_path = str(Path(tmpdir) / 'cmyk.jpg')
+    Image.open(snow).convert('CMYK').save(cmyk_path)
+    result = model.predict(cmyk_path)
+    assert result[0][0] == 'Azure'
+
+
+def test_color_distance_hue_wraparound():
+    # Hue is circular - a red at hue 0.99 must score as close to a red at
+    # hue 0.01 as one 0.02 away in the middle of the range
+    from photonix.classifiers.color.model import ColorModel
+
+    model = ColorModel()
+    red_high_hue = (255, 0, 15)   # Hue just below 1.0
+    red_low_hue = (255, 15, 0)    # Hue just above 0.0
+    green = (0, 255, 0)
+    assert model.color_distance(red_high_hue, red_low_hue) > model.color_distance(red_high_hue, green)
 
 
 def test_location_predict():
