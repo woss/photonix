@@ -38,5 +38,17 @@ test:
 test-coverage:
 	$(DOCKER_COMPOSE_DEV) run -e PYTHONDONTWRITEBYTECODE=1 -e COVERAGE=1 --rm photonix python test.py
 
+lint-ui:
+	cd ui && npm run lint
+
+build-ui:
+	cd ui && npm run build
+
+# Playwright suite is the UI test suite; needs the dev stack running (make start)
+e2e:
+	cd ui && npm run test:e2e
+
+test-ui: e2e
+
 reset:
 	$(DOCKER_COMPOSE_DEV) down -v
