@@ -39,7 +39,6 @@ services:
     ports:
       - '8888:80'
       - '8889:8000'
-      - '6006:6006'
       - '8880:8001'
     environment:
       ENV: dev
@@ -53,7 +52,6 @@ services:
       REDIS_HOST: redis
       ALLOWED_HOSTS: '*'
       LOG_LEVEL: DEBUG
-      WDS_SOCKET_PORT: 0
     volumes:
       - ../photonix:/srv/photonix
       - ../system:/srv/system
