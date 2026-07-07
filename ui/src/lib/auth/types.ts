@@ -42,6 +42,15 @@ export interface RevokeTokenResponse {
   }
 }
 
+export interface DeleteAuthCookiesResponse {
+  deleteTokenCookie: {
+    deleted: boolean
+  }
+  deleteRefreshTokenCookie: {
+    deleted: boolean
+  }
+}
+
 export interface Environment {
   demo: boolean
   sampleData: boolean

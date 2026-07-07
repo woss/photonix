@@ -4,6 +4,7 @@ import type {
   TokenAuthResponse,
   RefreshTokenResponse,
   RevokeTokenResponse,
+  DeleteAuthCookiesResponse,
   EnvironmentResponse,
 } from './types'
 
@@ -39,6 +40,22 @@ export const REVOKE_TOKEN: TypedDocumentNode<
   mutation RevokeToken($refreshToken: String!) {
     revokeToken(refreshToken: $refreshToken) {
       revoked
+    }
+  }
+`
+
+// Asks the server to clear the httpOnly JWT (access) and refresh-token cookies
+// that JavaScript cannot remove on its own.
+export const DELETE_AUTH_COOKIES: TypedDocumentNode<
+  DeleteAuthCookiesResponse,
+  Record<string, never>
+> = gql`
+  mutation DeleteAuthCookies {
+    deleteTokenCookie {
+      deleted
+    }
+    deleteRefreshTokenCookie {
+      deleted
     }
   }
 `

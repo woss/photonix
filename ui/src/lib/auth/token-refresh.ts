@@ -11,6 +11,13 @@ const ERROR_REFRESH_INTERVAL = 15 * 1000    // Retry interval on error
 let refreshTimeout: ReturnType<typeof setTimeout> | null = null
 let onAuthFailure: (() => void) | null = null
 let visibilityListenerActive = false
+// Guards against a refresh that was in flight when the user logged out
+// re-establishing the session with the rotated token.
+let sessionActive = false
+
+export function setSessionActive(active: boolean): void {
+  sessionActive = active
+}
 
 export function setAuthFailureCallback(callback: () => void): void {
   onAuthFailure = callback
@@ -73,6 +80,10 @@ export async function performTokenRefresh(): Promise<User | false> {
     if (result.error) throw result.error
 
     if (result.data?.refreshToken) {
+      // The user logged out while this refresh was in flight — don't store the
+      // rotated token and re-create the session they just ended.
+      if (!sessionActive) return false
+
       const { token, refreshToken: newRefreshToken, payload } = result.data.refreshToken
 
       setAccessToken(token, payload.exp)
