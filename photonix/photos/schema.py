@@ -236,6 +236,7 @@ class LibrarySetting(graphene.ObjectType):
 
     library = graphene.Field(LibraryType)
     source_folder = graphene.String()
+    watch_photos = graphene.Boolean()
 
 class PhotoMetadataFields(graphene.ObjectType):
     """ Metadata about photo as extracted by exiftool """
@@ -615,7 +616,11 @@ class Query(graphene.ObjectType):
         if libraries:
             library_obj = libraries[0]
             library_path = library_obj.paths.all()[0]
-            return {"library": library_obj, "source_folder": library_path.path}
+            return {
+                "library": library_obj,
+                "source_folder": library_path.path,
+                "watch_photos": library_path.watch_for_changes,
+            }
         raise Exception('User is not the owner of library!')
 
     @login_required
@@ -658,6 +663,7 @@ class LibraryInput(graphene.InputObjectType):
     classification_object_enabled = graphene.Boolean()
     classification_face_enabled = graphene.Boolean()
     source_folder = graphene.String(required=False)
+    watch_photos = graphene.Boolean(required=False)
     user_id = graphene.ID()
     library_id = graphene.ID()
 
@@ -845,6 +851,28 @@ class UpdateLibrarySourceFolder(graphene.Mutation):
             raise Exception('User is not the owner of library!')
         else:
             return UpdateLibrarySourceFolder(ok=ok, source_folder=None)
+
+
+class UpdateLibraryWatchPhotos(graphene.Mutation):
+    """Persist the per-library "watch folder for new photos" toggle."""
+
+    class Arguments:
+        input = LibraryInput(required=False)
+
+    ok = graphene.Boolean()
+    watch_photos = graphene.Boolean()
+
+    @staticmethod
+    def mutate(root, info, input=None):
+        user = info.context.user
+        libraries = Library.objects.filter(users__user=user, users__owner=True, id=input.library_id)
+        if not libraries:
+            raise Exception('User is not the owner of library!')
+        if str(input.get('watch_photos')) == 'None':
+            return UpdateLibraryWatchPhotos(ok=False, watch_photos=None)
+        watch = input.watch_photos
+        libraries[0].paths.all().update(watch_for_changes=watch)
+        return UpdateLibraryWatchPhotos(ok=True, watch_photos=watch)
 
 
 class CreateLibraryInput(graphene.InputObjectType):
@@ -1319,6 +1347,7 @@ class Mutation(graphene.ObjectType):
     update_object_enabled = UpdateLibraryObjectEnabled.Field()
     update_face_enabled = UpdateLibraryFaceEnabled.Field()
     update_source_folder = UpdateLibrarySourceFolder.Field()
+    update_watch_photos = UpdateLibraryWatchPhotos.Field()
     create_library = CreateLibrary.Field()
     Photo_importing = PhotoImporting.Field()
     image_analysis = ImageAnalysis.Field()
