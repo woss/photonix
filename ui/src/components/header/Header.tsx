@@ -5,9 +5,11 @@ import {
   CircleUser,
   Library,
   Settings,
+  KeyRound,
   LogOut,
 } from 'lucide-react'
 import Logo from '../../assets/logo.svg'
+import { useUIStore } from '../../lib/ui/store'
 
 interface UserProfile {
   username: string
@@ -61,6 +63,7 @@ export function Header({
 }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const openModal = useUIStore((s) => s.openModal)
 
   useClickOutside(menuRef, () => setIsMenuOpen(false))
 
@@ -138,10 +141,27 @@ export function Header({
               </li>
             ))}
 
-            {/* Settings - TODO: Add /settings route */}
+            {/* Account */}
             <li
-              onClick={() => setIsMenuOpen(false)}
+              onClick={() => {
+                openModal('account')
+                setIsMenuOpen(false)
+              }}
               className="flex items-center px-4 py-3 cursor-pointer text-neutral-300 hover:bg-white/10 hover:text-white transition-colors"
+              data-testid="account-menu-item"
+            >
+              <KeyRound className="w-6 h-6 mr-2.5 text-white/90" />
+              <span className="text-sm">Account</span>
+            </li>
+
+            {/* Settings */}
+            <li
+              onClick={() => {
+                openModal('settings')
+                setIsMenuOpen(false)
+              }}
+              className="flex items-center px-4 py-3 cursor-pointer text-neutral-300 hover:bg-white/10 hover:text-white transition-colors"
+              data-testid="settings-menu-item"
             >
               <Settings className="w-6 h-6 mr-2.5 text-white/90" />
               <span className="text-sm">Settings</span>
