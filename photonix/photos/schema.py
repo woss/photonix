@@ -435,9 +435,10 @@ class Query(graphene.ObjectType):
         photo_id = kwargs.get('photo_id')
         count = kwargs.get('count', 100)
 
-        # Get the target photo
+        # Get the target photo, scoped to the requesting user's libraries so a
+        # caller can't discover another user's photo id/rotation by bare pk.
         try:
-            target_photo = Photo.objects.get(pk=photo_id)
+            target_photo = Photo.objects.for_user(user).get(pk=photo_id)
         except Photo.DoesNotExist:
             return None
 

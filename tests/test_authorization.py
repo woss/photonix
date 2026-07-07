@@ -80,6 +80,25 @@ def test_all_photos_excludes_other_libraries(victim, attacker_client):
     assert ids == [str(attacker_client.photo.id)]
 
 
+def test_cannot_read_another_users_photos_around(victim, attacker_client):
+    """photosAround must not leak a target photo's id/rotation to a user who
+    has no access to its library (regression for P0.4)."""
+    query = """
+        query PhotosAround($photoId: UUID!) {
+            photosAround(photoId: $photoId) { photoIds currentIndex }
+        }
+    """
+    response = attacker_client.post_graphql(query, {'photoId': str(victim['photo'].id)})
+    data = get_graphql_content(response)
+    assert data['data']['photosAround'] is None
+
+    # The attacker's own photo is still navigable
+    response = attacker_client.post_graphql(query, {'photoId': str(attacker_client.photo.id)})
+    data = get_graphql_content(response)
+    assert str(attacker_client.photo.id) in data['data']['photosAround']['photoIds']
+    assert str(victim['photo'].id) not in data['data']['photosAround']['photoIds']
+
+
 def test_cannot_read_another_users_photo_file_metadata(victim, attacker_client):
     query = """
         query PhotoFileMetadata($photoFileId: UUID) {
