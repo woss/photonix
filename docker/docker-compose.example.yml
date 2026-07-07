@@ -10,6 +10,12 @@ services:
   postgres:
     container_name: photonix-postgres
     image: postgres:18-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
     environment:
       POSTGRES_DB: photonix
       POSTGRES_PASSWORD: password
@@ -22,11 +28,18 @@ services:
   redis:
     container_name: photonix-redis
     image: redis:8-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   photonix:
     user: "2000:2000"
     container_name: photonix
     image: photonixapp/photonix:latest
+    restart: unless-stopped
     ports:
       - '8888:80'
     environment:

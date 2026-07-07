@@ -11,20 +11,33 @@ services:
     user: "70:70"
     container_name: photonix-postgres
     image: postgres:18-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: photonix
       POSTGRES_PASSWORD: password
     volumes:
       - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     user: "999:999"
     container_name: photonix-redis
     image: redis:8-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   photonix:
     user: "2000:2000"
     container_name: photonix
+    restart: unless-stopped
     # image: photonixapp/photonix:latest
     image: photonix
     build:

@@ -173,6 +173,10 @@ RUN groupadd -g $GID photonix && \
     chown -R photonix:photonix /srv /var/lib/nginx /var/log/nginx /var/run /run /tmp
 USER photonix
 
+# Long start period covers first-boot migrations and model downloads
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1/', timeout=5)"
+
 CMD ["./system/run.sh"]
 
 EXPOSE 80
