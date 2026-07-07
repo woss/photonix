@@ -62,3 +62,23 @@ h1 {
 h2 {
   font-size: 25px;
 }
+
+/* Circular photo markers on the map view */
+.leaflet-photo-icon {
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+}
+
+.leaflet-pin-icon span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #14b8a6;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}

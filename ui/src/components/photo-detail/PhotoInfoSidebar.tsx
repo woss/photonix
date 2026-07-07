@@ -5,6 +5,7 @@ import { ImageHistogram } from './ImageHistogram'
 import { EditableTags } from './EditableTags'
 import { PhotoFileMetadata } from './PhotoFileMetadata'
 import { TagList } from './TagList'
+import { MapView } from '../map/MapView'
 import { ColorTags } from './ColorTags'
 import { getPhotoThumbnailUrl, type ThumbnailResolution } from '../../lib/photos/image-cache-store'
 import type { PhotoDetail } from '../../lib/photos/detail-types'
@@ -263,11 +264,15 @@ export function PhotoInfoSidebar({
           </Section>
         )}
 
-        {/* Map placeholder - will use Leaflet later */}
+        {/* Mini-map for the photo's location */}
         {photo.location && (
           <Section title="Map" index={sectionIndex++}>
-            <div className="w-full h-32 bg-neutral-800 rounded border border-neutral-600 flex items-center justify-center text-white/40">
-              Map: {photo.location[0].toFixed(4)}, {photo.location[1].toFixed(4)}
+            <div className="w-full h-32 rounded border border-neutral-600 overflow-hidden">
+              <MapView
+                location={photo.location}
+                zoom={6}
+                hideAttribution
+              />
             </div>
           </Section>
         )}
