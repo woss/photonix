@@ -194,13 +194,14 @@ export const GET_PHOTO_FILE_METADATA: TypedDocumentNode<
   }
 `
 
-// Query for photos around a specific photo (for navigation when directly landing on photo detail)
+// Query for photos around a specific photo (for navigation when directly landing on photo detail).
+// multiFilter keeps prev/next navigation within the active search/filter context.
 export const GET_PHOTOS_AROUND: TypedDocumentNode<
   PhotosAroundResponse,
-  { photoId: string; count?: number }
+  { photoId: string; count?: number; multiFilter?: string }
 > = gql`
-  query GetPhotosAround($photoId: UUID!, $count: Int) {
-    photosAround(photoId: $photoId, count: $count) {
+  query GetPhotosAround($photoId: UUID!, $count: Int, $multiFilter: String) {
+    photosAround(photoId: $photoId, count: $count, multiFilter: $multiFilter) {
       photoIds
       rotations
       currentIndex

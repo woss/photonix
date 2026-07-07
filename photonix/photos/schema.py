@@ -311,6 +311,7 @@ class Query(graphene.ObjectType):
         PhotosAroundType,
         photo_id=graphene.UUID(required=True),
         count=graphene.Int(default_value=100),
+        multi_filter=graphene.String(),
         description="Get photo IDs around a specific photo for navigation"
     )
 
@@ -431,10 +432,13 @@ class Query(graphene.ObjectType):
 
         Returns up to `count` photos before and after the specified photo,
         in the default ordering (-taken_at). Also returns rotations for each photo.
+        When `multi_filter` is supplied, neighbours are restricted to photos
+        matching the filter so navigation stays within the filtered context.
         """
         user = info.context.user
         photo_id = kwargs.get('photo_id')
         count = kwargs.get('count', 100)
+        multi_filter = kwargs.get('multi_filter')
 
         # Get the target photo, scoped to the requesting user's libraries so a
         # caller can't discover another user's photo id/rotation by bare pk.
@@ -450,6 +454,17 @@ class Query(graphene.ObjectType):
             thumbnailed_version__isnull=False,
             deleted=False
         ).order_by('-taken_at')
+
+        # Restrict neighbours to the active search/filter context (same
+        # semantics as the all_photos multi_filter). The target photo itself is
+        # always included so the viewer can render it even if it no longer
+        # matches the filter.
+        if multi_filter:
+            filters = [
+                v for v in multi_filter.split(' ')
+                if v != '' and v not in ['in', 'near', 'during', 'taken', 'on', 'of']
+            ]
+            base_qs = filter_photos_queryset(filters, base_qs).order_by('-taken_at')
 
         # Get photos taken after (or at same time but different id) - these come BEFORE in the list
         # Since ordering is -taken_at, photos with later taken_at come first

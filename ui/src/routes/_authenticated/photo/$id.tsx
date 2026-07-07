@@ -3,6 +3,7 @@ import { useQuery } from '@apollo/client/react'
 import { useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { GET_PHOTO, GET_PHOTOS_AROUND } from '../../../lib/photos/detail-graphql'
+import { usePhotoFilters } from '../../../lib/search'
 import { usePhotoListStore } from '../../../lib/photos/photo-list-store'
 import { PhotoDetailView } from '../../../components/photo-detail'
 import type { PhotoDetail } from '../../../lib/photos/detail-types'
@@ -27,9 +28,11 @@ function PhotoDetailPage() {
   // Check if the requested photo is in our photo list (carousel navigation)
   const isInPhotoList = photoIds.includes(id)
 
-  // Fetch surrounding photos when landing directly on this page
+  // Fetch surrounding photos when landing directly on this page, staying
+  // within the active search/filter context (if any).
+  const multiFilter = usePhotoFilters()
   const { data: photosAroundData } = useQuery(GET_PHOTOS_AROUND, {
-    variables: { photoId: id, count: 100 },
+    variables: { photoId: id, count: 100, multiFilter: multiFilter || undefined },
     skip: !needsPhotoList,
   })
 

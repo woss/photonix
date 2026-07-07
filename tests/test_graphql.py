@@ -151,6 +151,39 @@ class TestGraphQL(unittest.TestCase):
         data = get_graphql_content(response)
         assert len(data['data']['allPhotos']['edges']) == 2
 
+    def test_photos_around_honours_multi_filter(self):
+        """photosAround navigation must stay within the active filter context."""
+        Photo.objects.update(thumbnailed_version=1)  # photosAround hides unthumbnailed photos
+        tree_tag, _ = Tag.objects.get_or_create(library=self.defaults['library'], name='Tree', type='O')
+        PhotoTag.objects.get_or_create(photo=self.defaults['snow_photo'], tag=tree_tag, confidence=1.0)
+
+        query = """
+            query PhotosAround($photoId: UUID!, $multiFilter: String) {
+                photosAround(photoId: $photoId, multiFilter: $multiFilter) {
+                    photoIds
+                    currentIndex
+                }
+            }
+        """
+        # Without a filter both photos are navigable
+        response = self.api_client.post_graphql(
+            query, {'photoId': str(self.defaults['snow_photo'].id)})
+        assert response.status_code == 200
+        data = get_graphql_content(response)
+        photo_ids = data['data']['photosAround']['photoIds']
+        assert str(self.defaults['snow_photo'].id) in photo_ids
+        assert str(self.defaults['tree_photo'].id) in photo_ids
+
+        # With a tag filter only matching photos (plus the target) remain
+        multi_filter = 'library_id:{0} tag:{1}'.format(self.defaults['library'].id, tree_tag.id)
+        response = self.api_client.post_graphql(
+            query, {'photoId': str(self.defaults['snow_photo'].id), 'multiFilter': multi_filter})
+        assert response.status_code == 200
+        data = get_graphql_content(response)
+        photo_ids = data['data']['photosAround']['photoIds']
+        assert photo_ids == [str(self.defaults['snow_photo'].id)]
+        assert data['data']['photosAround']['currentIndex'] == 0
+
     def test_all_libraries(self):
         """Test list of libraries."""
         query = """
