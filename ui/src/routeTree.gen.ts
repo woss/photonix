@@ -24,7 +24,8 @@ import { Route as AuthenticatedBrowseRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedBrowseIndexRouteImport } from './routes/_authenticated/_browse/index'
 import { Route as AuthenticatedPhotoIdRouteImport } from './routes/_authenticated/photo/$id'
 import { Route as AuthenticatedBrowseMapRouteImport } from './routes/_authenticated/_browse/map'
-import { Route as AuthenticatedBrowseAlbumsRouteImport } from './routes/_authenticated/_browse/albums'
+import { Route as AuthenticatedBrowseAlbumsIndexRouteImport } from './routes/_authenticated/_browse/albums/index'
+import { Route as AuthenticatedBrowseAlbumsAlbumIdRouteImport } from './routes/_authenticated/_browse/albums/$albumId'
 
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
@@ -100,10 +101,16 @@ const AuthenticatedBrowseMapRoute = AuthenticatedBrowseMapRouteImport.update({
   path: '/map',
   getParentRoute: () => AuthenticatedBrowseRoute,
 } as any)
-const AuthenticatedBrowseAlbumsRoute =
-  AuthenticatedBrowseAlbumsRouteImport.update({
-    id: '/albums',
-    path: '/albums',
+const AuthenticatedBrowseAlbumsIndexRoute =
+  AuthenticatedBrowseAlbumsIndexRouteImport.update({
+    id: '/albums/',
+    path: '/albums/',
+    getParentRoute: () => AuthenticatedBrowseRoute,
+  } as any)
+const AuthenticatedBrowseAlbumsAlbumIdRoute =
+  AuthenticatedBrowseAlbumsAlbumIdRouteImport.update({
+    id: '/albums/$albumId',
+    path: '/albums/$albumId',
     getParentRoute: () => AuthenticatedBrowseRoute,
   } as any)
 
@@ -119,9 +126,10 @@ export interface FileRoutesByFullPath {
   '/onboarding/step4': typeof OnboardingStep4Route
   '/onboarding/step5': typeof OnboardingStep5Route
   '/onboarding/': typeof OnboardingIndexRoute
-  '/albums': typeof AuthenticatedBrowseAlbumsRoute
   '/map': typeof AuthenticatedBrowseMapRoute
   '/photo/$id': typeof AuthenticatedPhotoIdRoute
+  '/albums/$albumId': typeof AuthenticatedBrowseAlbumsAlbumIdRoute
+  '/albums/': typeof AuthenticatedBrowseAlbumsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedBrowseIndexRoute
@@ -134,9 +142,10 @@ export interface FileRoutesByTo {
   '/onboarding/step4': typeof OnboardingStep4Route
   '/onboarding/step5': typeof OnboardingStep5Route
   '/onboarding': typeof OnboardingIndexRoute
-  '/albums': typeof AuthenticatedBrowseAlbumsRoute
   '/map': typeof AuthenticatedBrowseMapRoute
   '/photo/$id': typeof AuthenticatedPhotoIdRoute
+  '/albums/$albumId': typeof AuthenticatedBrowseAlbumsAlbumIdRoute
+  '/albums': typeof AuthenticatedBrowseAlbumsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -152,10 +161,11 @@ export interface FileRoutesById {
   '/onboarding/step4': typeof OnboardingStep4Route
   '/onboarding/step5': typeof OnboardingStep5Route
   '/onboarding/': typeof OnboardingIndexRoute
-  '/_authenticated/_browse/albums': typeof AuthenticatedBrowseAlbumsRoute
   '/_authenticated/_browse/map': typeof AuthenticatedBrowseMapRoute
   '/_authenticated/photo/$id': typeof AuthenticatedPhotoIdRoute
   '/_authenticated/_browse/': typeof AuthenticatedBrowseIndexRoute
+  '/_authenticated/_browse/albums/$albumId': typeof AuthenticatedBrowseAlbumsAlbumIdRoute
+  '/_authenticated/_browse/albums/': typeof AuthenticatedBrowseAlbumsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -171,9 +181,10 @@ export interface FileRouteTypes {
     | '/onboarding/step4'
     | '/onboarding/step5'
     | '/onboarding/'
-    | '/albums'
     | '/map'
     | '/photo/$id'
+    | '/albums/$albumId'
+    | '/albums/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -186,9 +197,10 @@ export interface FileRouteTypes {
     | '/onboarding/step4'
     | '/onboarding/step5'
     | '/onboarding'
-    | '/albums'
     | '/map'
     | '/photo/$id'
+    | '/albums/$albumId'
+    | '/albums'
   id:
     | '__root__'
     | '/_authenticated'
@@ -203,10 +215,11 @@ export interface FileRouteTypes {
     | '/onboarding/step4'
     | '/onboarding/step5'
     | '/onboarding/'
-    | '/_authenticated/_browse/albums'
     | '/_authenticated/_browse/map'
     | '/_authenticated/photo/$id'
     | '/_authenticated/_browse/'
+    | '/_authenticated/_browse/albums/$albumId'
+    | '/_authenticated/_browse/albums/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -323,26 +336,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrowseMapRouteImport
       parentRoute: typeof AuthenticatedBrowseRoute
     }
-    '/_authenticated/_browse/albums': {
-      id: '/_authenticated/_browse/albums'
+    '/_authenticated/_browse/albums/': {
+      id: '/_authenticated/_browse/albums/'
       path: '/albums'
-      fullPath: '/albums'
-      preLoaderRoute: typeof AuthenticatedBrowseAlbumsRouteImport
+      fullPath: '/albums/'
+      preLoaderRoute: typeof AuthenticatedBrowseAlbumsIndexRouteImport
+      parentRoute: typeof AuthenticatedBrowseRoute
+    }
+    '/_authenticated/_browse/albums/$albumId': {
+      id: '/_authenticated/_browse/albums/$albumId'
+      path: '/albums/$albumId'
+      fullPath: '/albums/$albumId'
+      preLoaderRoute: typeof AuthenticatedBrowseAlbumsAlbumIdRouteImport
       parentRoute: typeof AuthenticatedBrowseRoute
     }
   }
 }
 
 interface AuthenticatedBrowseRouteChildren {
-  AuthenticatedBrowseAlbumsRoute: typeof AuthenticatedBrowseAlbumsRoute
   AuthenticatedBrowseMapRoute: typeof AuthenticatedBrowseMapRoute
   AuthenticatedBrowseIndexRoute: typeof AuthenticatedBrowseIndexRoute
+  AuthenticatedBrowseAlbumsAlbumIdRoute: typeof AuthenticatedBrowseAlbumsAlbumIdRoute
+  AuthenticatedBrowseAlbumsIndexRoute: typeof AuthenticatedBrowseAlbumsIndexRoute
 }
 
 const AuthenticatedBrowseRouteChildren: AuthenticatedBrowseRouteChildren = {
-  AuthenticatedBrowseAlbumsRoute: AuthenticatedBrowseAlbumsRoute,
   AuthenticatedBrowseMapRoute: AuthenticatedBrowseMapRoute,
   AuthenticatedBrowseIndexRoute: AuthenticatedBrowseIndexRoute,
+  AuthenticatedBrowseAlbumsAlbumIdRoute: AuthenticatedBrowseAlbumsAlbumIdRoute,
+  AuthenticatedBrowseAlbumsIndexRoute: AuthenticatedBrowseAlbumsIndexRoute,
 }
 
 const AuthenticatedBrowseRouteWithChildren =

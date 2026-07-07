@@ -10,9 +10,15 @@ import { usePhotoListStore } from '../../lib/photos/photo-list-store'
 import { GET_PHOTOS, PHOTOS_PER_PAGE } from '../../lib/photos/graphql'
 import type { ThumbnailPhoto, PhotoEdge, AllPhotosResponse } from '../../lib/photos/types'
 
-export function Thumbnails() {
+interface ThumbnailsProps {
+  // When set, restrict the grid to photos tagged with this album (a Tag id).
+  albumId?: string
+}
+
+export function Thumbnails({ albumId }: ThumbnailsProps = {}) {
   const { activeLibraryId } = useLibrariesStore()
-  const filters = usePhotoFilters()
+  const baseFilters = usePhotoFilters()
+  const filters = albumId ? `${baseFilters} tag:${albumId}` : baseFilters
   const navigate = useNavigate()
   const { setPhotoList, saveScrollPosition, scrollPosition } = usePhotoListStore()
 
