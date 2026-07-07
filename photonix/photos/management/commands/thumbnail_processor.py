@@ -1,5 +1,6 @@
 import queue
 import threading
+import traceback
 from multiprocessing import cpu_count
 from time import sleep
 
@@ -21,9 +22,19 @@ def worker():
         if task is None:
             break
 
-        generate_thumbnails_for_photo(task.subject_id, task)
-
-        q.task_done()
+        # An unhandled exception here would kill the thread and, without
+        # task_done(), leave the dispatch loop blocked on q.join() forever
+        try:
+            generate_thumbnails_for_photo(task.subject_id, task)
+        except Exception:
+            logger.error(f'Error generating thumbnails for photo {task.subject_id}')
+            traceback.print_exc()
+            try:
+                task.failed()
+            except Exception:
+                logger.error(f'Could not mark task {task.id} as failed')
+        finally:
+            q.task_done()
 
 
 class Command(BaseCommand):

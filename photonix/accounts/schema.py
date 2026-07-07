@@ -1,6 +1,7 @@
 import os
 
-from django.contrib.auth import get_user_model, authenticate, update_session_auth_hash
+from django.conf import settings
+from django.contrib.auth import get_user_model, authenticate, load_backend, login, update_session_auth_hash
 import graphene
 from graphene_django.types import DjangoObjectType
 from graphql import GraphQLError
@@ -15,6 +16,7 @@ User = get_user_model()
 class UserType(DjangoObjectType):
     class Meta:
         model = User
+        fields = "__all__"
 
 
 class CreateUser(graphene.Mutation):
@@ -40,6 +42,16 @@ class CreateUser(graphene.Mutation):
             user.set_password(password1)
             user.has_set_personal_info = True
             user.save()
+            # Start a session for the new account so the remaining first-run
+            # onboarding steps (createLibrary, PhotoImporting, imageAnalysis)
+            # can require an authenticated user matching the supplied userId,
+            # rather than trusting a client-supplied id from any caller.
+            for backend in settings.AUTHENTICATION_BACKENDS:
+                if user == load_backend(backend).get_user(user.pk):
+                    user.backend = backend
+                    break
+            if hasattr(user, 'backend'):
+                login(info.context, user)
         return CreateUser(
             has_set_personal_info=user.has_set_personal_info,
             ok=True, user_id=user.id)
@@ -74,8 +86,8 @@ class Query(graphene.ObjectType):
 
     def resolve_environment(self, info):
         user = User.objects.first()
-        demo = os.environ.get('DEMO', False)
-        sample_data = os.environ.get('DEMO', False) or os.environ.get('SAMPLE_DATA', False)
+        demo = os.environ.get('DEMO', '').lower() in ('1', 'true', 'yes')
+        sample_data = demo or os.environ.get('SAMPLE_DATA', '').lower() in ('1', 'true', 'yes')
 
         if user and user.has_set_personal_info and \
             user.has_created_library and user.has_configured_importing and \
@@ -133,7 +145,7 @@ class ChangePassword(graphene.Mutation):
 
     @staticmethod
     def mutate(self, info, old_password, new_password):
-        if os.environ.get('DEMO', False) and os.environ.get('ENV') != 'test':
+        if os.environ.get('DEMO', '').lower() in ('1', 'true', 'yes') and os.environ.get('ENV') != 'test':
             raise GraphQLError('Password cannot be changed in demo mode!')
         if authenticate(username=info.context.user.username, password=old_password):
             info.context.user.set_password(new_password)
@@ -148,5 +160,9 @@ class Mutation(graphene.ObjectType):
     verify_token = graphql_jwt.Verify.Field()
     refresh_token = graphql_jwt.Refresh.Field()
     revoke_token = graphql_jwt.Revoke.Field()
+    # Allow logout to clear the httpOnly JWT (access) and refresh-token cookies
+    # that the browser cannot remove itself.
+    delete_token_cookie = graphql_jwt.DeleteJSONWebTokenCookie.Field()
+    delete_refresh_token_cookie = graphql_jwt.DeleteRefreshTokenCookie.Field()
     create_user = CreateUser.Field()
     change_password = ChangePassword.Field()

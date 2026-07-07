@@ -1,4 +1,3 @@
-from __future__ import unicode_literals
 from pathlib import Path
 
 from django.conf import settings
@@ -18,6 +17,24 @@ LIBRARY_SETUP_STAGE_COMPLETED_CHOICES = (
     ('Im', 'Photo importing configured'),
     ('Th', 'Thumbnailing storage configured'),
 )
+
+
+class ForUserQuerySet(models.QuerySet):
+    """Scopes lookups to libraries the given user is a member of.
+
+    API resolvers must never look objects up by bare primary key - always go
+    through for_user() so one user can't read or mutate another's data.
+    """
+    user_path = 'library__users__user'
+
+    def for_user(self, user):
+        if user is None or user.is_anonymous:
+            return self.none()
+        return self.filter(**{self.user_path: user})
+
+
+class PhotoRelatedForUserQuerySet(ForUserQuerySet):
+    user_path = 'photo__library__users__user'
 
 
 class Library(UUIDModel, VersionedModel):
@@ -92,6 +109,8 @@ class Camera(UUIDModel, VersionedModel):
     earliest_photo = models.DateTimeField()
     latest_photo = models.DateTimeField()
 
+    objects = ForUserQuerySet.as_manager()
+
     class Meta:
         unique_together = [['library', 'make', 'model']]
         ordering = ['make', 'model']
@@ -105,6 +124,8 @@ class Lens(UUIDModel, VersionedModel):
     name = models.CharField(max_length=128)
     earliest_photo = models.DateTimeField()
     latest_photo = models.DateTimeField()
+
+    objects = ForUserQuerySet.as_manager()
 
     class Meta:
         verbose_name_plural = 'lenses'
@@ -137,6 +158,8 @@ class Photo(UUIDModel, VersionedModel):
     preferred_photo_file = models.ForeignKey('PhotoFile', related_name='+', null=True, on_delete=models.SET_NULL)  # File selected by the user that is the best version to be used
     thumbnailed_version = models.PositiveIntegerField(default=0)  # Version from photos.utils.thumbnails.THUMBNAILER_VERSION at time of generating the required thumbnails declared in settings.THUMBNAIL_SIZES
     deleted = models.BooleanField(default=False)
+
+    objects = ForUserQuerySet.as_manager()
 
     class Meta:
         ordering = ['-taken_at']
@@ -171,13 +194,16 @@ class Photo(UUIDModel, VersionedModel):
 
     @property
     def download_url(self):
-        library_url = self.library.get_library_path_store().url
-        if not library_url:
-            library_url = '/photos/'
-        library_path = self.library.get_library_path_store().path
-        if not library_path:
-            library_path = '/data/photos/'
-        return self.base_file.path.replace(library_path, library_url)
+        path = str(self.base_file.path)
+        # Local files live under /data and must not be exposed at their real
+        # (guessable/enumerable) filename — serve them via an unguessable,
+        # uuid4-based per-photo URL instead.
+        if path.startswith('/data'):
+            return '/download/{}/'.format(self.id)
+        # External/remote library backends keep their own direct URL.
+        library_url = self.library.get_library_path_store().url or '/photos/'
+        library_path = self.library.get_library_path_store().path or '/data/photos/'
+        return path.replace(library_path, library_url)
 
     @property
     def dimensions(self):
@@ -228,6 +254,8 @@ class PhotoFile(UUIDModel, VersionedModel):
     exif_rotation = models.PositiveIntegerField(null=True, default=0)
     user_rotation = models.PositiveIntegerField(null=True, default=0)
 
+    objects = PhotoRelatedForUserQuerySet.as_manager()
+
     def __str__(self):
         return str(self.path)
 
@@ -268,6 +296,8 @@ class Tag(UUIDModel, VersionedModel):
     source = models.CharField(max_length=1, choices=SOURCE_CHOICES, db_index=True)
     ordering = models.FloatField(null=True)
 
+    objects = ForUserQuerySet.as_manager()
+
     class Meta:
         ordering = ['ordering', 'name']
         unique_together = [['library', 'name', 'type', 'source']]
@@ -294,6 +324,8 @@ class PhotoTag(UUIDModel, VersionedModel):
     # A place to store extra JSON data such as face feature positions for eyes, nose and mouth
     extra_data = models.TextField(null=True)
     deleted = models.BooleanField(default=False)
+
+    objects = PhotoRelatedForUserQuerySet.as_manager()
 
     class Meta:
         ordering = ['-significance']
@@ -331,16 +363,30 @@ class Task(UUIDModel, VersionedModel):
     def __str__(self):
         return '{}: {}'.format(self.type, self.created_at)
 
-    def start(self):
-        self.status = 'S'
-        self.started_at = timezone.now()
-        self.save()
+    def claim(self):
+        """Atomically claim a Pending task for processing.
+
+        Uses a conditional UPDATE so that when several processor replicas
+        fetch the same Pending task, only one of them wins the claim and
+        the others skip it. Returns True if this caller claimed the task.
+        """
+        now = timezone.now()
+        claimed = Task.objects.filter(pk=self.pk, status='P').update(
+            status='S', started_at=now, updated_at=now)
+        if claimed:
+            self.refresh_from_db()
+        return bool(claimed)
 
     def complete(self, next_type=None, next_subject_id=None):
-        # Set status of current task and queue up next task if appropriate
-        self.status = 'C'
-        self.finished_at = timezone.now()
-        self.save()
+        # Atomically transition to Completed. If another process completed
+        # this task already, do nothing - otherwise concurrent completions
+        # would each create their own downstream task chain.
+        now = timezone.now()
+        updated = Task.objects.filter(pk=self.pk).exclude(status='C').update(
+            status='C', finished_at=now, updated_at=now)
+        if not updated:
+            return
+        self.refresh_from_db()
 
         # Create next task in the chain if there should be one
         if not self.parent and next_type:
@@ -349,16 +395,21 @@ class Task(UUIDModel, VersionedModel):
         if self.parent and self.parent.complete_with_children:
             # If all siblings are complete, we should mark our parent as complete
             with transaction.atomic():
-                # select_for_update() will block if another process is working with these children
-                siblings = self.parent.children.select_for_update().filter(status='C')
-                if siblings.count() == self.parent.children.count():
-                    self.parent.complete(
+                # Lock the parent row so only one completing child at a time
+                # runs the all-siblings-complete check
+                parent = Task.objects.select_for_update().get(pk=self.parent_id)
+                if parent.status != 'C' and not parent.children.exclude(status='C').exists():
+                    parent.complete(
                         next_type=next_type, next_subject_id=next_subject_id)
 
     def failed(self, error=None, traceback=None):
-        self.status = 'F'
-        self.finished_at = timezone.now()
-        self.save()
+        # Atomically transition to Failed. Never clobber a concurrent
+        # completion - a task that already Completed stays Completed.
+        now = timezone.now()
+        updated = Task.objects.filter(pk=self.pk).exclude(status='C').update(
+            status='F', finished_at=now, updated_at=now)
+        if updated:
+            self.refresh_from_db()
 
         if error:
             logger.error(error)

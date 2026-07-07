@@ -1,6 +1,5 @@
 
 import datetime
-import os
 from pathlib import Path
 import unittest
 
@@ -60,19 +59,6 @@ class TestGraphQL(unittest.TestCase):
             'tree_photo': tree_photo,
             'password': 'demo123456',
         }
-
-    def test_fix347(self):
-        # Test fix 347 - Photos with same date are not imported
-        path_photo1 = str(Path(__file__).parent / 'photos' / 'photo_no_metadata_1.jpg')
-        Path(path_photo1).touch()
-
-        path_photo2 = str(Path(__file__).parent / 'photos' / 'photo_no_metadata_2.jpg')
-        Path(path_photo2).touch()
-
-        photo1 = record_photo(path_photo1, self._library)
-        photo2 = record_photo(path_photo2, self._library)
-
-        assert(not photo1 == photo2)
 
     def test_user_login_environment(self):
         """Test user logged in successfully or not."""
@@ -385,7 +371,7 @@ class TestGraphQL(unittest.TestCase):
         data = get_graphql_content(response)
         assert response.status_code == 200
         self.assertEqual(tuple(tuple(tuple(data.values())[0].values())[0].values())[0].get('starRating'),4)
-        self.assertEqual(tuple(tuple(tuple(data.values())[0].values())[0].values())[0].get('aperture'), self.defaults['snow_photo'].aperture)
+        self.assertEqual(tuple(tuple(tuple(data.values())[0].values())[0].values())[0].get('aperture'), str(self.defaults['snow_photo'].aperture))
 
     def test_create_generic_tag_mutation(self):
         """Test create_generic_tag mutation response."""
@@ -544,7 +530,7 @@ class TestGraphQL(unittest.TestCase):
         assert response.status_code == 200
         data = get_graphql_content(response)
         self.assertEqual(data['data']['photo']['id'], str(self.defaults['tree_photo'].id))
-        self.assertEqual(data['data']['photo']['aperture'], self.defaults['tree_photo'].aperture)
+        self.assertEqual(data['data']['photo']['aperture'], str(self.defaults['tree_photo'].aperture))
         self.assertEqual(data['data']['photo']['exposure'], self.defaults['tree_photo'].exposure)
         self.assertEqual(data['data']['photo']['isoSpeed'], self.defaults['tree_photo'].iso_speed)
         self.assertEqual(str(data['data']['photo']['focalLength']), self.defaults['tree_photo'].focal_length)
@@ -741,7 +727,7 @@ class TestGraphQL(unittest.TestCase):
         self.assertEqual(len(data['data']['allColorTags']), 2)
         self.assertEqual(data['data']['allColorTags'][0]['name'], white_color_tag.name)
         self.assertEqual(data['data']['allColorTags'][1]['name'], color_type_tag.name)
-        self.assertEqual(data['data']['allApertures'][0], self.defaults['tree_photo'].aperture)
+        self.assertEqual(data['data']['allApertures'][0], float(self.defaults['tree_photo'].aperture))
         self.assertEqual(data['data']['allCameras'][0]['id'], str(self.defaults['snow_photo'].camera.id))
         self.assertEqual(str(data['data']['allFocalLengths'][0]), self.defaults['snow_photo'].focal_length)
 
@@ -757,6 +743,13 @@ class TestGraphQLOnboarding(unittest.TestCase):
 
     def test_onboarding_steps(self):
         """Check all the steps of onboarding(user sign up) process."""
+        from django.contrib.auth.models import AnonymousUser
+        from .conftest import ApiClient
+
+        # First-run onboarding happens before any user or JWT exists, so drive
+        # it with an anonymous client. createUser establishes a session cookie
+        # that the client carries into the remaining steps.
+        self.api_client = ApiClient(user=AnonymousUser())
         environment_query = """
             query{
                 environment {
@@ -791,7 +784,9 @@ class TestGraphQLOnboarding(unittest.TestCase):
         assert User.objects.all().count() == 1
         assert User.objects.first().has_set_personal_info
         self.assertFalse(User.objects.first().has_created_library)
-        self.assertFalse(response.wsgi_request.user.username)
+        # createUser now starts a session so the remaining onboarding steps
+        # run as the authenticated new user.
+        self.assertEqual(response.wsgi_request.user.username, 'demo')
         mutation = """
             mutation ($name: String!,$backendType: String!,$path: String!,$userId: ID!) 
                 {

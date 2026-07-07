@@ -1,5 +1,5 @@
 ARG ARCH=
-FROM ${ARCH}python:3.8.12-slim-bullseye as builder
+FROM ${ARCH}python:3.13-slim-trixie AS builder
 
 # Install system dependencies - note that some of these are only used on non-amd64 where Python packages have to be compiled from source
 RUN apt-get update && \
@@ -9,7 +9,7 @@ RUN apt-get update && \
         curl \
         gfortran \
         gnupg \
-        libatlas-base-dev \
+        libopenblas-dev \
         libblas-dev \
         libblas3 \
         libfreetype6 \
@@ -19,7 +19,7 @@ RUN apt-get update && \
         liblapack3 \
         libpq-dev \
         libssl-dev \
-        libtiff5-dev \
+        libtiff-dev \
     && \
         apt-get clean && \
             rm -rf /var/lib/apt/lists/* \
@@ -45,9 +45,11 @@ RUN pip install --no-cache-dir pypi-uploader==1.1.0
 COPY requirements.txt /srv/requirements.txt
 COPY docker/install_and_upload_python_packages.py /root/install_and_upload_python_packages.py
 ENV PYTHONUNBUFFERED=1
-ARG PYPI_UPLOAD_USERNAME
-ARG PYPI_UPLOAD_PASSWORD
-RUN if [ "${PYPI_UPLOAD_USERNAME}" = "" ] ; \
+RUN --mount=type=secret,id=PYPI_UPLOAD_USERNAME \
+    --mount=type=secret,id=PYPI_UPLOAD_PASSWORD \
+    PYPI_UPLOAD_USERNAME=$(cat /run/secrets/PYPI_UPLOAD_USERNAME 2>/dev/null || echo "") && \
+    PYPI_UPLOAD_PASSWORD=$(cat /run/secrets/PYPI_UPLOAD_PASSWORD 2>/dev/null || echo "") && \
+    if [ "${PYPI_UPLOAD_USERNAME}" = "" ] ; \
      then python /root/install_and_upload_python_packages.py ; \
      else python /root/install_and_upload_python_packages.py -u ${PYPI_UPLOAD_USERNAME} -p ${PYPI_UPLOAD_PASSWORD} ; \
     fi
@@ -71,46 +73,80 @@ COPY ui/tsconfig.node.json /srv/ui/tsconfig.node.json
 RUN NODE_OPTIONS="--max-old-space-size=768" npm run build
 
 # Remove large unused files in Python site-packages
-RUN find /usr/local/lib/python3.8 -type d -name  "__pycache__" -exec rm -r {} + && \
-    find /usr/local/lib/python3.8/site-packages -type d -name  "tests" -exec rm -r {} +
+RUN find /usr/local/lib/python3.13 -type d -name  "__pycache__" -exec rm -r {} + && \
+    find /usr/local/lib/python3.13/site-packages -type d -name  "tests" -exec rm -r {} +
 RUN rm -rf \
-    /usr/local/lib/python3.8/site-packages/tensorflow/include \
-    /usr/local/lib/python3.8/site-packages/scipy \
-    /usr/local/lib/python3.8/site-packages/django/contrib/gis \
-    /usr/local/lib/python3.8/site-packages/django/contrib/humanize \
-    /usr/local/lib/python3.8/site-packages/django/contrib/admindocs \
-    /usr/local/lib/python3.8/site-packages/django/contrib/redirects \
-    /usr/local/lib/python3.8/site-packages/django/contrib/flatpages \
-    /usr/local/lib/python3.8/site-packages/django/contrib/sitemaps \
-    /usr/local/lib/python3.8/site-packages/django/contrib/syndication \
-    /usr/local/lib/python3.8/site-packages/matplotlib/backends \
-    /usr/local/lib/python3.8/site-packages/matplotlib/tests \
-    /usr/local/lib/python3.8/site-packages/matplotlib/mpl-data/fonts \
-    /usr/local/lib/python3.8/site-packages/matplotlib/mpl-data/sample_data \
-    /usr/local/lib/python3.8/site-packages/matplotlib/mpl-data/images \
-    /usr/local/lib/python3.8/site-packages/matplotlib/mpl-data/stylelib \
-    /usr/local/lib/python3.8/site-packages/tensorboard \
-    /usr/local/lib/python3.8/site-packages/tensorboard_plugin_wit
+    /usr/local/lib/python3.13/site-packages/tensorflow/include \
+    /usr/local/lib/python3.13/site-packages/tensorflow/xla_aot_runtime_src \
+    /usr/local/lib/python3.13/site-packages/tensorflow/THIRD_PARTY_NOTICES.txt \
+    /usr/local/lib/python3.13/site-packages/scipy \
+    /usr/local/lib/python3.13/site-packages/scipy.libs \
+    /usr/local/lib/python3.13/site-packages/clang \
+    /usr/local/lib/python3.13/site-packages/pip \
+    /usr/local/lib/python3.13/site-packages/setuptools \
+    /usr/local/lib/python3.13/site-packages/grpc_tools \
+    /usr/local/lib/python3.13/site-packages/pypi_uploader \
+    /usr/local/lib/python3.13/site-packages/fontTools \
+    /usr/local/lib/python3.13/site-packages/cv2/data \
+    /usr/local/lib/python3.13/site-packages/numpy/f2py \
+    /usr/local/lib/python3.13/site-packages/django/contrib/gis \
+    /usr/local/lib/python3.13/site-packages/django/contrib/humanize \
+    /usr/local/lib/python3.13/site-packages/django/contrib/admindocs \
+    /usr/local/lib/python3.13/site-packages/django/contrib/redirects \
+    /usr/local/lib/python3.13/site-packages/django/contrib/flatpages \
+    /usr/local/lib/python3.13/site-packages/django/contrib/sitemaps \
+    /usr/local/lib/python3.13/site-packages/django/contrib/syndication \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/qt_compat.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_qt*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_gtk*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_wx*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_tk*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_cairo*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_nbagg*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_webagg*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_pdf*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_pgf*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_ps*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/backend_svg*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/_backend_tk*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/backends/_backend_gtk*.py \
+    /usr/local/lib/python3.13/site-packages/matplotlib/tests \
+    /usr/local/lib/python3.13/site-packages/matplotlib/mpl-data/fonts \
+    /usr/local/lib/python3.13/site-packages/matplotlib/mpl-data/sample_data \
+    /usr/local/lib/python3.13/site-packages/matplotlib/mpl-data/images \
+    /usr/local/lib/python3.13/site-packages/matplotlib/mpl-data/stylelib \
+    /usr/local/lib/python3.13/site-packages/tensorboard \
+    /usr/local/lib/python3.13/site-packages/tensorboard_plugin_wit \
+    /usr/local/lib/python3.13/site-packages/pytest \
+    /usr/local/lib/python3.13/site-packages/_pytest \
+    /usr/local/lib/python3.13/site-packages/pytest_django \
+    /usr/local/lib/python3.13/site-packages/pluggy \
+    /usr/local/lib/python3.13/site-packages/iniconfig \
+    /usr/local/lib/python3.13/site-packages/mock \
+    /usr/local/lib/python3.13/site-packages/factory \
+    /usr/local/lib/python3.13/site-packages/faker \
+    /usr/local/lib/python3.13/site-packages/coverage
 
 
-FROM ${ARCH}python:3.8.12-slim-bullseye
+FROM ${ARCH}python:3.13-slim-trixie
+
+ARG UID=2000
+ARG GID=2000
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        cron \
         dcraw \
         file \
-        libatlas3-base \
+        libopenblas0 \
         libfreetype6 \
-        libfreetype6-dev \
         libgl1 \
-        libglib2.0-dev \
-        libhdf5-dev \
+        libglib2.0-0t64 \
+        libhdf5-310 \
         libheif-examples \
         libimage-exiftool-perl \
-        libpq-dev \
-        libtiff5-dev \
-        netcat \
+        libpq5 \
+        libtiff6 \
+        netcat-openbsd \
         nginx-light \
         supervisor \
         xz-utils \
@@ -121,7 +157,7 @@ RUN apt-get update && \
                    /var/tmp/*
 
 # Copy over installed Python packages and built JS bundle
-COPY --from=builder /usr/local/lib/python3.8/site-packages /usr/local/lib/python3.8/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /srv/ui/build /srv/ui/build
 
@@ -130,23 +166,26 @@ WORKDIR /srv
 # Copy over the code
 COPY photonix /srv/photonix
 COPY manage.py /srv/manage.py
-COPY test.py /srv/test.py
-COPY tests /srv/tests
 COPY ui/public /srv/ui/public
 
 # Copy system config and init scripts
 COPY system /srv/system
 COPY system/supervisord.conf /etc/supervisord.conf
 
-# Copy crontab
-COPY system/cron.d /etc/cron.d/
-RUN chmod 0644 /etc/cron.d/*
+ENV PYTHONPATH=/srv
+ENV TF_CPP_MIN_LOG_LEVEL=3
 
-ENV PYTHONPATH /srv
-ENV TF_CPP_MIN_LOG_LEVEL 3
+RUN python photonix/manage.py collectstatic --noinput --link
 
-RUN DJANGO_SECRET_KEY=test python photonix/manage.py collectstatic --noinput --link
+RUN groupadd -g $GID photonix && \
+    useradd -u $UID -g $GID -s /bin/sh photonix && \
+    chown -R photonix:photonix /srv /var/lib/nginx /var/log/nginx /var/run /run /tmp
+USER photonix
 
-CMD ./system/run.sh
+# Long start period covers first-boot migrations and model downloads
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5m --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1/', timeout=5)"
+
+CMD ["./system/run.sh"]
 
 EXPOSE 80

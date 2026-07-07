@@ -24,5 +24,8 @@ class Command(BaseCommand):
         logger.info('Rescan complete')
 
     def handle(self, *args, **options):
-        with Lock(redis_connection, 'rescan_photos'):
+        # auto_renewal keeps the lock alive for however long the rescan takes
+        # but lets it expire if this process is killed, instead of blocking
+        # every future rescan until Redis is flushed
+        with Lock(redis_connection, 'rescan_photos', expire=300, auto_renewal=True):
             self.rescan_photos(options['paths'])

@@ -1,11 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from dateutil.parser import parse as parse_date
 import mimetypes
 import os
 import re
 from subprocess import Popen, PIPE
 
-from django.utils.timezone import utc
+utc = timezone.utc
 
 
 class PhotoMetadata(object):
@@ -57,11 +57,12 @@ def parse_gps_location(gps_str):
     regex = r'''(\d{1,3}) deg (\d{1,2})' (\d{1,2}).(\d{2})" ([N,S]), (\d{1,3}) deg (\d{1,2})' (\d{1,2}).(\d{2})" ([E,W])'''
     m = re.search(regex, gps_str)
 
-    latitude = float(m.group(1)) + (float(m.group(2)) / 60) + (float('{}.{}'.format(m.group(3), m.group(4))) / 60 / 100)
+    # Degrees plus minutes/60 plus seconds/3600
+    latitude = float(m.group(1)) + (float(m.group(2)) / 60) + (float('{}.{}'.format(m.group(3), m.group(4))) / 3600)
     if m.group(5) == 'S':
         latitude *= -1
 
-    longitude = float(m.group(6)) + (float(m.group(7)) / 60) + (float('{}.{}'.format(m.group(8), m.group(9))) / 60 / 100)
+    longitude = float(m.group(6)) + (float(m.group(7)) / 60) + (float('{}.{}'.format(m.group(8), m.group(9))) / 3600)
     if m.group(10) == 'W':
         longitude *= -1
 

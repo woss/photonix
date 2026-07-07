@@ -1,4 +1,5 @@
 import os
+import struct
 from pathlib import Path
 
 from django.conf import settings
@@ -25,6 +26,131 @@ PHOTOS = [
 ]
 
 
+def test_get_exiftool_image_returns_output_files(tmpdir):
+    # Used by CR3 processing - a bug where dict entries were annotated
+    # instead of assigned made this always return an empty dict, breaking
+    # Canon CR3 imports entirely
+    from photonix.photos.utils import raw
+
+    basename = 'IMG_0001.CR3'
+    for fn in [basename, 'IMG_0001.jpg', 'IMG_0001.jpg_original']:
+        (Path(tmpdir) / fn).touch()
+
+    result = raw.__get_exiftool_image(str(tmpdir), basename)
+    assert result['output'] == Path(tmpdir) / 'IMG_0001.jpg'
+    assert result['original'] == Path(tmpdir) / 'IMG_0001.jpg_original'
+
+
+def build_synthetic_dng(path, width=512, height=512):
+    """Write a minimal but valid Bayer CFA DNG that dcraw can process.
+
+    Generated at test time so no large raw file has to live in the repo or
+    be downloaded - real camera raws stay in the network-marked tests below.
+    """
+    TYPE_BYTE, TYPE_ASCII, TYPE_SHORT, TYPE_LONG, TYPE_SRATIONAL = 1, 2, 3, 4, 10
+
+    strip = b''.join(
+        struct.pack('<H', ((x * 127) + (y * 31)) % 65536)
+        for y in range(height) for x in range(width))
+
+    make = b'PhotonixTest\x00'
+    model = b'Synthetic DNG\x00'
+    unique_camera_model = b'PhotonixTest Synthetic DNG\x00'
+    modify_date = b'2019:06:15 12:00:00\x00'
+    identity_matrix = b''.join(struct.pack('<ll', v, 10000)
+                               for v in [10000, 0, 0, 0, 10000, 0, 0, 0, 10000])
+
+    tags = [  # (tag id, type, count, packed value)
+        (254, TYPE_LONG, 1, struct.pack('<L', 0)),           # NewSubfileType
+        (256, TYPE_LONG, 1, struct.pack('<L', width)),
+        (257, TYPE_LONG, 1, struct.pack('<L', height)),
+        (258, TYPE_SHORT, 1, struct.pack('<H', 16)),         # BitsPerSample
+        (259, TYPE_SHORT, 1, struct.pack('<H', 1)),          # Uncompressed
+        (262, TYPE_SHORT, 1, struct.pack('<H', 32803)),      # Photometric: CFA
+        (271, TYPE_ASCII, len(make), make),
+        (272, TYPE_ASCII, len(model), model),
+        (273, TYPE_LONG, 1, None),                           # StripOffsets (fixed up below)
+        (277, TYPE_SHORT, 1, struct.pack('<H', 1)),          # SamplesPerPixel
+        (278, TYPE_LONG, 1, struct.pack('<L', height)),      # RowsPerStrip
+        (279, TYPE_LONG, 1, struct.pack('<L', len(strip))),  # StripByteCounts
+        (284, TYPE_SHORT, 1, struct.pack('<H', 1)),          # PlanarConfiguration
+        (306, TYPE_ASCII, len(modify_date), modify_date),
+        (33421, TYPE_SHORT, 2, struct.pack('<HH', 2, 2)),    # CFARepeatPatternDim
+        (33422, TYPE_BYTE, 4, bytes([0, 1, 1, 2])),          # CFAPattern: RGGB
+        (50706, TYPE_BYTE, 4, bytes([1, 4, 0, 0])),          # DNGVersion
+        (50707, TYPE_BYTE, 4, bytes([1, 1, 0, 0])),          # DNGBackwardVersion
+        (50708, TYPE_ASCII, len(unique_camera_model), unique_camera_model),
+        (50717, TYPE_LONG, 1, struct.pack('<L', 65535)),     # WhiteLevel
+        (50721, TYPE_SRATIONAL, 9, identity_matrix),         # ColorMatrix1
+        (50778, TYPE_SHORT, 1, struct.pack('<H', 21)),       # CalibrationIlluminant1: D65
+    ]
+
+    # Values wider than 4 bytes live after the IFD and are pointed at by offset
+    data_start = 8 + 2 + len(tags) * 12 + 4
+    out_of_line = {}
+    cursor = data_start
+    for tag, _, _, packed in tags:
+        if packed is not None and len(packed) > 4:
+            out_of_line[tag] = cursor
+            cursor += len(packed) + (len(packed) % 2)
+    strip_offset = cursor
+
+    buf = bytearray()
+    buf += b'II*\x00' + struct.pack('<L', 8)
+    buf += struct.pack('<H', len(tags))
+    for tag, typ, count, packed in tags:
+        if tag == 273:
+            packed = struct.pack('<L', strip_offset)
+        buf += struct.pack('<HHL', tag, typ, count)
+        buf += struct.pack('<L', out_of_line[tag]) if tag in out_of_line else packed.ljust(4, b'\x00')
+    buf += struct.pack('<L', 0)  # No next IFD
+    for tag, _, _, packed in tags:
+        if tag in out_of_line:
+            buf += packed + b'\x00' * (len(packed) % 2)
+    buf += strip
+    with open(path, 'wb') as f:
+        f.write(bytes(buf))
+
+
+@pytest.mark.django_db
+def test_raw_task_pipeline_with_synthetic_dng(tmpdir):
+    # Covers the raw processing task chain without needing to download real
+    # camera files (those are exercised by the network-marked tests)
+    from photonix.photos.utils.db import record_photo
+
+    raw_path = str(Path(tmpdir) / 'synthetic.dng')
+    build_synthetic_dng(raw_path)
+
+    library = LibraryFactory()
+    photo = record_photo(raw_path, library)
+    photo_file = photo.files.get()
+    assert photo_file.mimetype == 'image/x-adobe-dng'
+
+    ensure_raw_processing_tasks()
+    parent_task = Task.objects.get(type='ensure_raw_processed', subject_id=photo.id)
+    child_task = Task.objects.get(type='process_raw', parent=parent_task)
+    assert parent_task.status == 'S'
+    assert child_task.status == 'P'
+    assert child_task.subject_id == photo_file.id
+
+    process_raw_tasks()
+    parent_task.refresh_from_db()
+    child_task.refresh_from_db()
+    assert parent_task.status == 'C'
+    assert child_task.status == 'C'
+
+    photo_file.refresh_from_db()
+    assert photo_file.raw_processed is True
+    assert photo_file.raw_external_params == 'dcraw -w'
+    output_path = Path(settings.PHOTO_RAW_PROCESSED_DIR) / '{}.jpg'.format(photo_file.id)
+    assert os.path.exists(output_path)
+    assert identified_as_jpeg(output_path) is True
+    assert Task.objects.filter(type='generate_thumbnails', subject_id=photo.id).count() == 1
+
+    os.remove(output_path)
+
+
+@pytest.mark.network
 def test_extract_jpg():
     for fn, intended_process_params, intended_filesize, urls in PHOTOS:
         raw_photo_path = str(Path(__file__).parent / 'photos' / fn)
@@ -41,6 +167,9 @@ def test_extract_jpg():
                         break
                 except:
                     pass
+
+        if not os.path.exists(raw_photo_path):
+            pytest.skip(f'Could not download raw photo: {fn}')
 
         output_path, _, process_params, _ = generate_jpeg(raw_photo_path)
 
@@ -67,10 +196,14 @@ def photo_fixture_raw(db):
             except:
                 pass
 
+    if not os.path.exists(raw_photo_path):
+        pytest.skip(f'Could not download raw photo: {PHOTOS[photo_index][0]}')
+
     library = LibraryFactory()
     return record_photo(raw_photo_path, library)
 
 
+@pytest.mark.network
 def test_task_raw_processing(photo_fixture_raw):
     # Task should have been created for the fixture
     task = Task.objects.get(type='ensure_raw_processed', status='P', subject_id=photo_fixture_raw.id)

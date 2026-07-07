@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime as dt
 import json
 import logging
 import os
@@ -9,7 +9,6 @@ from random import randint
 from annoy import AnnoyIndex
 
 logger = logging.getLogger(__name__)
-from django.utils import timezone
 import numpy as np
 from PIL import Image, ImageOps
 from redis_lock import Lock
@@ -57,26 +56,20 @@ class FaceModel(BaseModel):
 
         self._graph_file = os.path.join(self.model_dir, graph_file)
         self._lock_name = lock_name
-        self._loaded = False
         self.graph = None
 
         # Download model files eagerly (cheap), but don't load into memory yet
         self.ensure_downloaded(lock_name=lock_name)
 
-    def _ensure_loaded(self):
-        """Lazy load the model on first use."""
-        if self._loaded:
-            return
-
+    def load(self):
         self.graph = self.load_graph(self._graph_file)
-        self._loaded = True
 
     def load_graph(self, graph_file):
         DeepFace, MTCNN, findEuclideanDistance, build_model = _ensure_face_libs()
-        with Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name)):
+        with self.load_lock():
             # Load MTCNN
             mtcnn_graph = None
-            mtcnn_key = '{self.graph_cache_key}:mtcnn'
+            mtcnn_key = f'{self.graph_cache_key}:mtcnn'
             if mtcnn_key in self.graph_cache:
                 mtcnn_graph = self.graph_cache[mtcnn_key]
             else:
@@ -85,7 +78,7 @@ class FaceModel(BaseModel):
 
             # Load Facenet
             facenet_graph = None
-            facenet_key = '{self.graph_cache_key}:facenet'
+            facenet_key = f'{self.graph_cache_key}:facenet'
             if facenet_key in self.graph_cache:
                 facenet_graph = self.graph_cache[facenet_key]
             else:
@@ -151,7 +144,7 @@ class FaceModel(BaseModel):
             embedding_size = 128  # FaceNet output size
             t = AnnoyIndex(embedding_size, 'euclidean')
             # Ensure ANN index, tag IDs and version files can't be updated while we are reading
-            with Lock(redis_connection, 'face_model_retrain'):
+            with Lock(redis_connection, 'face_model_retrain', expire=60, auto_renewal=True):
                 self.reload_retrained_model_version()
                 t.load(str(ann_path))
                 with open(tag_ids_path) as f:
@@ -204,7 +197,7 @@ class FaceModel(BaseModel):
 
         oldest_date = None
         if self.retrained_version:
-            oldest_date = datetime.strptime(str(self.retrained_version), '%Y%m%d%H%M%S').replace(tzinfo=timezone.utc)
+            oldest_date = dt.datetime.strptime(str(self.retrained_version), '%Y%m%d%H%M%S').replace(tzinfo=dt.timezone.utc)
 
         brute_force_nearest, brute_force_distance = self.find_closest_face_tag_by_brute_force(source_embedding, oldest_date=oldest_date)
 
@@ -225,7 +218,7 @@ class FaceModel(BaseModel):
 
         embedding_size = 128  # FaceNet output size
         t = AnnoyIndex(embedding_size, 'euclidean')
-        retrained_version = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+        retrained_version = dt.datetime.utcnow().strftime('%Y%m%d%H%M%S')
 
         tag_ids = []
         if training_data:  # Mainly as an option for testing
@@ -233,7 +226,10 @@ class FaceModel(BaseModel):
                 t.add_item(len(tag_ids), embedding)
                 tag_ids.append(id)
         else:
-            for photo_tag in PhotoTag.objects.filter(tag__type='F').order_by('id'):
+            # Only train on this library's faces - the index is saved
+            # per-library so mixing in other libraries' embeddings causes
+            # wrong matches and leaks faces across libraries
+            for photo_tag in PhotoTag.objects.filter(photo__library_id=self.library_id, tag__type='F').order_by('id'):
                 try:
                     extra_data = json.loads(photo_tag.extra_data)
                     embedding = extra_data['facenet_embedding']
@@ -246,7 +242,7 @@ class FaceModel(BaseModel):
         t.build(3)  # Number of random forest trees
 
         # Aquire lock to save ANN, tag IDs and version files atomically
-        with Lock(redis_connection, 'face_model_retrain'):
+        with Lock(redis_connection, 'face_model_retrain', expire=60, auto_renewal=True):
             # Save ANN index
             t.save(str(ann_path))
 
@@ -266,7 +262,7 @@ class FaceModel(BaseModel):
             if os.path.exists(version_file):
                 with open(version_file) as f:
                     contents = f.read().strip()
-                    version_date = datetime.strptime(contents, '%Y%m%d%H%M%S').replace(tzinfo=timezone.utc)
+                    version_date = dt.datetime.strptime(contents, '%Y%m%d%H%M%S').replace(tzinfo=dt.timezone.utc)
                     self.retrained_version = int(version_date.strftime('%Y%m%d%H%M%S'))
                     return self.retrained_version
         return 0
@@ -298,6 +294,14 @@ def run_on_photo(photo_id):
         model.library_id = photo.library_id
     image_data = Image.open(path)
 
+    # Apply the same rotation predict() used so that the detected bounding
+    # boxes line up with the bitmap we crop faces from
+    if photo:
+        from photonix.photos.utils.rotation import apply_photo_rotation
+        image_data = apply_photo_rotation(image_data, photo.base_file)
+    else:
+        image_data = ImageOps.exif_transpose(image_data)
+
     # Loop over each face that was detected above
     for result in results:
         # Crop individual face + 30% extra in each direction
@@ -317,7 +321,6 @@ def run_on_photo(photo_id):
             pass
 
     if photo:
-        from django.utils import timezone
         from photonix.photos.models import Tag, PhotoTag
 
         photo.clear_tags(source='C', type='F')
@@ -337,10 +340,13 @@ def run_on_photo(photo_id):
                         tag.save()
                         break
 
-            x = (result['box'][0] + (result['box'][2] / 2)) / photo.base_file.width
-            y = (result['box'][1] + (result['box'][3] / 2)) / photo.base_file.height
-            width = result['box'][2] / photo.base_file.width
-            height = result['box'][3] / photo.base_file.height
+            # Normalize positions by the rotated image's dimensions - the
+            # boxes are relative to the displayed orientation, not the
+            # pre-rotation dimensions stored on the PhotoFile
+            x = (result['box'][0] + (result['box'][2] / 2)) / image_data.width
+            y = (result['box'][1] + (result['box'][3] / 2)) / image_data.height
+            width = result['box'][2] / image_data.width
+            height = result['box'][3] / image_data.height
             score = result['confidence']
 
             extra_data = ''
@@ -348,9 +354,6 @@ def run_on_photo(photo_id):
                 extra_data = json.dumps({'facenet_embedding': result['embedding']})
 
             PhotoTag(photo=photo, tag=tag, source='F', confidence=score, significance=score, position_x=x, position_y=y, size_x=width, size_y=height, model_version=model.version, retrained_model_version=model.retrained_version, extra_data=extra_data).save()
-        photo.classifier_color_completed_at = timezone.now()
-        photo.classifier_color_version = getattr(model, 'version', 0)
-        photo.save()
 
     return photo, results
 

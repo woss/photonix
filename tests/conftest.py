@@ -1,13 +1,15 @@
 import json
 import os
 
+os.environ['ENV'] = 'test'  # Must be set before Django loads URLs
+
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.contrib.auth.models import AnonymousUser
 from django.shortcuts import reverse
 from django.test.client import MULTIPART_CONTENT, Client
 from graphql_jwt.shortcuts import get_token
-import mock
+from unittest import mock
 import pytest
 
 from .factories import UserFactory
@@ -21,21 +23,28 @@ def django_db_modify_db_settings(django_db_modify_db_settings,):
     os.environ['ENV'] = 'test'
     settings.DATABASES['default'] = {
         'ENGINE':   'django.db.backends.sqlite3',
-        'NAME':     ':memory:'
+        'NAME':     ':memory:',
+        'ATOMIC_REQUESTS': False,
     }
 
 
 @pytest.fixture(autouse=True)
 def mock_redis(request):
-    mocks = ['photonix.classifiers.base_model.Lock',
-             'photonix.classifiers.style.model.Lock',
-             'photonix.classifiers.object.model.Lock']
-    mocks = [mock.patch(x, mock.MagicMock()) for x in mocks]
-    for m in mocks:
-        m.start()
-    yield
-    for m in mocks:
-        m.stop()
+    # All classifiers take their download/load locks via base_model
+    with mock.patch('photonix.classifiers.base_model.Lock', mock.MagicMock()):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def reset_model_manager_cooldown():
+    """Clear the ModelManager load cooldown in Redis so tests don't block each other."""
+    import redis as _redis
+    from photonix.classifiers.model_manager import LAST_MODEL_LOAD_KEY
+    from photonix.photos.utils.redis import redis_connection
+    try:
+        redis_connection.delete(LAST_MODEL_LOAD_KEY)
+    except _redis.exceptions.ConnectionError:
+        pass
 
 
 # These fixtures come from the Saleor project and are licensed as BSD-3-Clause

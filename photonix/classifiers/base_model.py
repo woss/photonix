@@ -18,11 +18,24 @@ graph_cache = {}
 
 logger = logging.getLogger(__name__)
 
+# Lazy-loaded TensorFlow module, shared by all classifiers that need it
+tf = None
+
+
+def ensure_tensorflow():
+    """Lazy load TensorFlow on first use."""
+    global tf
+    if tf is None:
+        import tensorflow as _tf
+        tf = _tf
+    return tf
+
 
 class BaseModel:
     def __init__(self, model_dir=None):
         global graph_cache
         self.graph_cache = graph_cache
+        self._loaded = False
 
         if model_dir:
             self.model_dir = model_dir
@@ -37,9 +50,24 @@ class BaseModel:
     def graph_cache_key(self):
         return '{}:{}'.format(self.name, self.model_dir)
 
+    def _ensure_loaded(self):
+        """Lazy load the model on first use."""
+        if self._loaded:
+            return
+        self.load()
+        self._loaded = True
+
+    def load(self):
+        """Load the model into memory. Subclasses must implement this."""
+        raise NotImplementedError
+
+    def load_lock(self):
+        """Redis lock held while loading the model into the graph cache."""
+        return Lock(redis_connection, 'classifier_{}_load_graph'.format(self.name), expire=120, auto_renewal=True)
+
     def get_model_info(self):
         from django.conf import settings
-        response = requests.get(settings.MODEL_INFO_URL)
+        response = requests.get(settings.MODEL_INFO_URL, timeout=30)
         models_info = json.loads(response.content)
         model_info = models_info[self.name][str(self.version)]
         return model_info
@@ -67,7 +95,9 @@ class BaseModel:
         if not lock_name:
             lock_name = 'classifier_{}_download'.format(self.name)
 
-        with Lock(redis_connection, lock_name):
+        # auto_renewal keeps the lock alive while we hold it but lets it
+        # expire if this process is killed, instead of deadlocking forever
+        with Lock(redis_connection, lock_name, expire=120, auto_renewal=True):
             # First check if version file matches AND all files exist
             try:
                 with open(version_file) as f:
@@ -94,7 +124,7 @@ class BaseModel:
                     index = random.choice(range(len(locations)))
                     location = locations.pop(index)
                     hash_sha256 = hashlib.sha256()
-                    request = requests.get(location, stream=True)
+                    request = requests.get(location, stream=True, timeout=30)
 
                     if request.status_code != 200:
                         error = True

@@ -1,21 +1,24 @@
 import os
 import re
-from time import sleep
 from uuid import UUID
 
 
 def get_or_create_tag(library, name, type, source, parent=None, ordering=None):
-    # get_or_create is not atomic so an instance could get created by another thread inbetween.
-    # This causes an IntegrityError due to the unique_together constraint.
+    # Only look up by the fields in the unique_together constraint
+    # (library, name, type, source) - including parent/ordering in the lookup
+    # would attempt to create a duplicate row and fail forever with an
+    # IntegrityError whenever a matching tag exists with a different parent
+    # or ordering.
     from django.db import IntegrityError
     from photonix.photos.models import Tag
 
-    while True:
-        try:
-            tag, _ = Tag.objects.get_or_create(library=library, name=name, type=type, source=source, parent=parent, ordering=ordering)
-            break
-        except IntegrityError:
-            sleep(1)
+    try:
+        tag, _ = Tag.objects.get_or_create(
+            library=library, name=name, type=type, source=source,
+            defaults={'parent': parent, 'ordering': ordering})
+    except IntegrityError:
+        # Another thread created the same tag between our get and create
+        tag = Tag.objects.get(library=library, name=name, type=type, source=source)
     return tag
 
 
@@ -55,4 +58,28 @@ def results_for_model_on_photo(model, photo_id):
         results = model.predict(photo.base_image_path, photo_file=photo.base_file)
     else:
         results = model.predict(photo_id)
+    return photo, results
+
+
+def run_classifier_on_photo(classifier_name, model_class, photo_id, tag_type,
+                            save_tags, has_results=None, model_kwargs=None):
+    """Shared template for classifier run_on_photo() implementations.
+
+    Fetches the model via the ModelManager, runs prediction, then (when given
+    a Photo rather than a bare file path) clears the classifier's previous
+    tags and calls save_tags(photo, results, model) to store the new ones.
+
+    has_results, if given, decides from the prediction results whether
+    existing tags should be replaced - e.g. style returns None for
+    unsupported file formats, which must not wipe previously created tags.
+    """
+    from photonix.classifiers.model_manager import get_model_manager
+
+    model = get_model_manager().get_model(classifier_name, model_class, **(model_kwargs or {}))
+    photo, results = results_for_model_on_photo(model, photo_id)
+
+    if photo and (has_results is None or has_results(results)):
+        photo.clear_tags(source='C', type=tag_type)
+        save_tags(photo, results, model)
+
     return photo, results

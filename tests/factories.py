@@ -11,8 +11,8 @@ class UserFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = User
 
-    username = 'test'
-    email = 'test@example.com'
+    username = factory.Sequence(lambda n: f'test{n}')
+    email = factory.Sequence(lambda n: f'test{n}@example.com')
     has_set_personal_info = True
     has_created_library = True
     has_configured_importing = True

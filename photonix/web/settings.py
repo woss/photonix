@@ -27,8 +27,10 @@ DEBUG = os.environ.get('ENV', 'prd') != 'prd'
 ALLOWED_HOSTS = os.environ.get(
     'ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]').split(',')
 
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+HTTPS = os.environ.get('HTTPS', 'true').lower() in ('1', 'true', 'yes')
+SESSION_COOKIE_SECURE = HTTPS
+CSRF_COOKIE_SECURE = HTTPS
+CSRF_FAILURE_VIEW = 'photonix.web.views.csrf_failure'
 
 # Application definition
 
@@ -167,8 +169,6 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_L10N = True
-
 USE_TZ = True
 
 
@@ -232,8 +232,12 @@ GRAPHQL_JWT = {
     'JWT_LONG_RUNNING_REFRESH_TOKEN': True,
     'JWT_EXPIRATION_DELTA': timedelta(minutes=15),
     'JWT_REFRESH_EXPIRATION_DELTA': timedelta(days=365),
+    # Only transmit the auth cookies over HTTPS in production, and never send
+    # them on cross-site requests.
+    'JWT_COOKIE_SECURE': HTTPS,
+    'JWT_COOKIE_SAMESITE': 'Lax',
 }
 
 APPEND_SLASHES = False
 
-CORS_ORIGIN_WHITELIST = []
+CORS_ALLOWED_ORIGINS = []

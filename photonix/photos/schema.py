@@ -23,16 +23,19 @@ User = get_user_model()
 class LibraryType(DjangoObjectType):
     class Meta:
         model = Library
+        fields = "__all__"
 
 
 class CameraType(DjangoObjectType):
     class Meta:
         model = Camera
+        fields = "__all__"
 
 
 class LensType(DjangoObjectType):
     class Meta:
         model = Lens
+        fields = "__all__"
 
 
 class PhotoTagType(DjangoObjectType):
@@ -40,6 +43,7 @@ class PhotoTagType(DjangoObjectType):
 
     class Meta:
         model = PhotoTag
+        fields = "__all__"
 
     def resolve_show_verify_icon(self, info):
         if self.tag.type == 'F' and not self.verified and self.tag.photo_tags.filter(verified=True).exists():
@@ -49,6 +53,7 @@ class PhotoTagType(DjangoObjectType):
 class PhotoFileType(DjangoObjectType):
     class Meta:
         model = PhotoFile
+        fields = "__all__"
 
 
 class CustomNode(graphene.Node):
@@ -87,6 +92,7 @@ class PhotoNode(DjangoObjectType):
 
     class Meta:
         model = Photo
+        fields = "__all__"
         interfaces = (CustomNode, PhotoInterface)
 
     def resolve_location(self, info):
@@ -192,31 +198,37 @@ class PhotoFilter(django_filters.FilterSet):
 class LocationTagType(DjangoObjectType):
     class Meta:
         model = Tag
+        fields = "__all__"
 
 
 class ObjectTagType(DjangoObjectType):
     class Meta:
         model = Tag
+        fields = "__all__"
 
 
 class PersonTagType(DjangoObjectType):
     class Meta:
         model = Tag
+        fields = "__all__"
 
 
 class ColorTagType(DjangoObjectType):
     class Meta:
         model = Tag
+        fields = "__all__"
 
 
 class StyleTagType(DjangoObjectType):
     class Meta:
         model = Tag
+        fields = "__all__"
 
 
 class EventTagType(DjangoObjectType):
     class Meta:
         model = Tag
+        fields = "__all__"
 
 
 class LibrarySetting(graphene.ObjectType):
@@ -237,6 +249,7 @@ class TagNode(DjangoObjectType):
 
     class Meta:
         model = Tag
+        fields = "__all__"
         filter_fields = {
             'name': ['exact', 'icontains', 'istartswith'],
         }
@@ -319,15 +332,16 @@ class Query(graphene.ObjectType):
 
     @login_required
     def resolve_camera(self, info, **kwargs):
+        user = info.context.user
         id = kwargs.get('id')
         make = kwargs.get('make')
         model = kwargs.get('model')
 
         if id is not None:
-            return Camera.objects.get(pk=id)
+            return Camera.objects.for_user(user).get(pk=id)
 
         if make is not None and model is not None:
-            return Camera.objects.get(make=make, model=model)
+            return Camera.objects.for_user(user).get(make=make, model=model)
 
         return None
 
@@ -339,14 +353,15 @@ class Query(graphene.ObjectType):
 
     @login_required
     def resolve_lens(self, info, **kwargs):
+        user = info.context.user
         id = kwargs.get('id')
         name = kwargs.get('name')
 
         if id is not None:
-            return Lens.objects.get(pk=id)
+            return Lens.objects.for_user(user).get(pk=id)
 
         if name is not None:
-            return Lens.objects.get(name=name)
+            return Lens.objects.for_user(user).get(name=name)
 
         return None
 
@@ -395,7 +410,7 @@ class Query(graphene.ObjectType):
     def resolve_photo(self, info, **kwargs):
         id = kwargs.get('id')
         if id is not None:
-            return Photo.objects.get(pk=id)
+            return Photo.objects.for_user(info.context.user).get(pk=id)
         return None
 
     @login_required
@@ -605,7 +620,7 @@ class Query(graphene.ObjectType):
     @login_required
     def resolve_photo_file_metadata(self, info, **kwargs):
         """Return metadata for photofile."""
-        photo_file = PhotoFile.objects.filter(id=kwargs.get('photo_file_id'))
+        photo_file = PhotoFile.objects.for_user(info.context.user).filter(id=kwargs.get('photo_file_id'))
         if photo_file and os.path.exists(photo_file[0].path):
             metadata = PhotoMetadata(photo_file[0].path)
             return {
@@ -843,6 +858,19 @@ class CreateLibraryInput(graphene.InputObjectType):
     user_id = graphene.ID(required=True)
 
 
+def get_onboarding_user(info, user_id):
+    # The onboarding mutations historically trusted the userId argument from
+    # unauthenticated callers, letting anyone act on (and ultimately be logged
+    # in as) an arbitrary account. CreateUser now starts a session, so require
+    # the caller to be that same user.
+    user = info.context.user
+    if not user.is_authenticated:
+        raise GraphQLError('Not logged in')
+    if str(user.pk) != str(user_id):
+        raise GraphQLError('Cannot perform onboarding for another user')
+    return user
+
+
 class CreateLibrary(graphene.Mutation):
     """Docstring for CreateLibrary."""
 
@@ -860,6 +888,7 @@ class CreateLibrary(graphene.Mutation):
     @staticmethod
     def mutate(self, info, input=None):
         """Mutate method."""
+        user = get_onboarding_user(info, input.user_id)
         library_obj = Library.objects.create(name=input.name)
         if input.backend_type == 'Lo':
             library_path_obj = LibraryPath.objects.create(
@@ -871,7 +900,6 @@ class CreateLibrary(graphene.Mutation):
                 type="St", path=input.path, url=input.get('url'),
                 s3_access_key_id=input.s3_access_key_id,
                 s3_secret_key=input.s3_secret_key)
-        user = User.objects.get(pk=input.user_id)
         user.has_created_library = True
         user.save()
         LibraryUser.objects.create(
@@ -910,15 +938,23 @@ class PhotoImporting(graphene.Mutation):
     @staticmethod
     def mutate(self, info, input=None):
         """Mutate method."""
-        library_path_obj = LibraryPath.objects.get(pk=input.library_path_id)
+        user = get_onboarding_user(info, input.user_id)
+        try:
+            library_path_obj = LibraryPath.objects.get(
+                pk=input.library_path_id, library__users__user=user)
+        except LibraryPath.DoesNotExist:
+            raise GraphQLError('Library path not found')
         library_path_obj.watch_for_changes = input.watch_for_changes
         library_path_obj.save()
         if input.add_another_path:
+            try:
+                library = Library.objects.get(pk=input.library_id, users__user=user)
+            except Library.DoesNotExist:
+                raise GraphQLError('Library not found')
             LibraryPath.objects.create(
-                library=Library.objects.get(pk=input.library_id),
+                library=library,
                 type="Im", backend_type="Lo",
                 path=input.import_path, delete_after_import=input.delete_after_import)
-        user = User.objects.get(pk=input.user_id)
         user.has_configured_importing = True
         user.save()
         return PhotoImporting(
@@ -941,24 +977,33 @@ class ImageAnalysis(graphene.Mutation):
     @staticmethod
     def mutate(self, info, input=None):
         """Mutate method."""
-        library_obj = Library.objects.get(pk=input.library_id)
+        user = get_onboarding_user(info, input.user_id)
+        try:
+            library_obj = Library.objects.get(pk=input.library_id, users__user=user)
+        except Library.DoesNotExist:
+            raise GraphQLError('Library not found')
         library_obj.classification_color_enabled = input.classification_color_enabled
         library_obj.classification_location_enabled = input.classification_location_enabled
         library_obj.classification_style_enabled = input.classification_style_enabled
         library_obj.classification_object_enabled = input.classification_object_enabled
         library_obj.classification_face_enabled = input.classification_face_enabled
         library_obj.save()
-        user = User.objects.get(pk=input.user_id)
+        # Only auto-login as part of genuine first-run onboarding, i.e. when this
+        # user is completing image-analysis configuration for the very first time.
+        # Without this guard the mutation would grant a session for ANY user_id
+        # with no password on an already-configured instance (account takeover).
+        is_onboarding = not user.has_configured_image_analysis
         user.has_configured_image_analysis = True
         user.save()
-        # For make user login automatically from backend.
-        if not hasattr(user, 'backend'):
-            for backend in settings.AUTHENTICATION_BACKENDS:
-                if user == load_backend(backend).get_user(user.pk):
-                    user.backend = backend
-                    break
-        if hasattr(user, 'backend'):
-            login(info.context, user)
+        if is_onboarding:
+            # For make user login automatically from backend.
+            if not hasattr(user, 'backend'):
+                for backend in settings.AUTHENTICATION_BACKENDS:
+                    if user == load_backend(backend).get_user(user.pk):
+                        user.backend = backend
+                        break
+            if hasattr(user, 'backend'):
+                login(info.context, user)
         # Finish user login
         return ImageAnalysis(
             has_configured_image_analysis=user.has_configured_image_analysis,
@@ -976,10 +1021,11 @@ class PhotoRating(graphene.Mutation):
     photo = graphene.Field(PhotoNode)
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_id=None, star_rating=None):
         try:
             if 0 <= star_rating <= 5:
-                photo_obj = Photo.objects.get(pk=photo_id)
+                photo_obj = Photo.objects.for_user(info.context.user).get(pk=photo_id)
                 photo_obj.star_rating = star_rating
                 photo_obj.save()
                 return PhotoRating(ok=True, photo=photo_obj)
@@ -999,9 +1045,10 @@ class CreateGenricTag(graphene.Mutation):
     name = graphene.String()
 
     @staticmethod
+    @login_required
     def mutate(self, info, name=None, photo_id=None):
         try:
-            photo_obj = Photo.objects.get(id=photo_id)
+            photo_obj = Photo.objects.for_user(info.context.user).get(id=photo_id)
         except Exception as e:
             raise GraphQLError("Invalid photo id!")
         tag_obj, created = Tag.objects.get_or_create(
@@ -1032,10 +1079,13 @@ class RemoveGenericTag(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_id=None, tag_id=None):
-        Photo.objects.get(id=photo_id).photo_tags.remove(PhotoTag.objects.get(photo_id=photo_id, tag__id=tag_id))
+        user = info.context.user
+        photo = Photo.objects.for_user(user).get(id=photo_id)
+        photo.photo_tags.remove(PhotoTag.objects.get(photo_id=photo_id, tag__id=tag_id))
         if Photo.objects.filter(photo_tags__tag__id=tag_id).count() == 0:
-            Tag.objects.get(id=tag_id).delete()
+            Tag.objects.for_user(user).get(id=tag_id).delete()
         return RemoveGenericTag(ok=True)
 
 
@@ -1050,6 +1100,7 @@ class ChangePreferredPhotoFile(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, selected_photo_file_id=None):
         """Mutation to update preferred_photo_file for photo.
 
@@ -1058,8 +1109,9 @@ class ChangePreferredPhotoFile(graphene.Mutation):
         """
         from photonix.photos.utils.tasks import queue_reclassification_for_photo
 
-        photo_obj = PhotoFile.objects.get(id=selected_photo_file_id).photo
-        photo_obj.preferred_photo_file = PhotoFile.objects.get(id=selected_photo_file_id)
+        photo_file = PhotoFile.objects.for_user(info.context.user).get(id=selected_photo_file_id)
+        photo_obj = photo_file.photo
+        photo_obj.preferred_photo_file = photo_file
         photo_obj.save()
         Task(type='generate_thumbnails', subject_id=photo_obj.id, library=photo_obj.library).save()
 
@@ -1080,10 +1132,11 @@ class EditFaceTag(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_tag_id=None, new_name=None):
         """Mutation to create or update face tags and assign them to photoTag."""
-        obj = Tag.objects.filter(name=new_name, type='F').first()
-        photo_tag = PhotoTag.objects.get(id=photo_tag_id)
+        photo_tag = PhotoTag.objects.for_user(info.context.user).get(id=photo_tag_id)
+        obj = Tag.objects.filter(library=photo_tag.photo.library, name=new_name, type='F').first()
         already_assigned_tag = photo_tag.tag
         if obj:
             photo_tag.tag = obj
@@ -1110,9 +1163,10 @@ class BlockFaceTag(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_tag_id=None, new_name=None):
         """Mutation to block a face 'F' type photoTag."""
-        photo_tag = PhotoTag.objects.get(id=photo_tag_id)
+        photo_tag = PhotoTag.objects.for_user(info.context.user).get(id=photo_tag_id)
         photo_tag.deleted = True
         photo_tag.verified = False
         photo_tag.confidence = 0
@@ -1131,9 +1185,10 @@ class VerifyPhoto(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_tag_id=None, new_name=None):
         """Mutation to set verify a face 'F' type photoTag."""
-        photo_tag = PhotoTag.objects.get(id=photo_tag_id)
+        photo_tag = PhotoTag.objects.for_user(info.context.user).get(id=photo_tag_id)
         photo_tag.verified = True
         photo_tag.confidence = 1
         photo_tag.save()
@@ -1150,9 +1205,10 @@ class AssignTagToPhotos(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, name, photo_ids, tag_type):
         try:
-            photo_list = Photo.objects.filter(id__in=photo_ids.split(',')) 
+            photo_list = Photo.objects.for_user(info.context.user).filter(id__in=photo_ids.split(','))
             tag_obj, created = Tag.objects.get_or_create(
                 library=photo_list[0].library,
                 name=name, type=tag_type, source='H', defaults={})            
@@ -1182,10 +1238,11 @@ class SetPhotosDeleted(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_ids):
         """Mutation to set delete field true for a photo objects."""
         try:
-            photo_list = Photo.objects.filter(id__in=photo_ids.split(','))       
+            photo_list = Photo.objects.for_user(info.context.user).filter(id__in=photo_ids.split(','))
             for photo in photo_list:
                 photo.deleted = True
                 photo.save() 
@@ -1206,11 +1263,12 @@ class RemovePhotosFromAlbum(graphene.Mutation):
     ok = graphene.Boolean()
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_ids, album_id):
         """Mutation remove photos from particular album tag."""
         try:
             for photo_id in photo_ids.split(','):
-                photo_tag = PhotoTag.objects.get(photo__id=photo_id,tag__id=album_id)
+                photo_tag = PhotoTag.objects.for_user(info.context.user).get(photo__id=photo_id,tag__id=album_id)
                 photo_tag.delete()
             return RemovePhotosFromAlbum(ok=True)
         except Exception as e:
@@ -1229,6 +1287,7 @@ class SavePhotoFileRotation(graphene.Mutation):
     rotation = graphene.Int()
 
     @staticmethod
+    @login_required
     def mutate(self, info, photo_file_id=None, rotation=None):
         """Mutation to save photoFile rotation.
 
@@ -1241,7 +1300,7 @@ class SavePhotoFileRotation(graphene.Mutation):
         from photonix.photos.utils.tasks import queue_reclassification_for_photo
 
         if photo_file_id and rotation in [0, 90, 180, 270]:
-            photofile_obj = PhotoFile.objects.get(id=photo_file_id)
+            photofile_obj = PhotoFile.objects.for_user(info.context.user).get(id=photo_file_id)
             photofile_obj.user_rotation = rotation
             photofile_obj.save()
 

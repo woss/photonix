@@ -1,12 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
-import imghdr
 import mimetypes
 import os, time
 import re
 import subprocess
 
-from django.utils.timezone import utc
+from PIL import Image, UnidentifiedImageError
+
+utc = timezone.utc
 
 from photonix.photos.models import Camera, Lens, Photo, PhotoFile, Task, Library, Tag, PhotoTag
 from photonix.photos.utils.metadata import PhotoMetadata, parse_datetime, parse_gps_location, get_mimetype
@@ -14,7 +15,7 @@ from photonix.web.utils import logger
 
 
 MIMETYPE_WHITELIST = [
-    # This list is in addition to the filetypes detected by imghdr and 'dcraw -i'
+    # This list is in addition to the filetypes detected by Pillow and 'dcraw -i'
     'image/heif',
     'image/heif-sequence',
     'image/heic',
@@ -24,27 +25,41 @@ MIMETYPE_WHITELIST = [
 ]
 
 
+def is_image(path):
+    """Detect bitmap image files by their header (replacement for the imghdr
+    module which was removed from the standard library in Python 3.13)."""
+    try:
+        with Image.open(path):
+            return True
+    except (UnidentifiedImageError, OSError):
+        return False
+
+
 def record_photo(path, library, inotify_event_type=None):
-    mimetype = get_mimetype(path)
-
-    if not imghdr.what(path) and not mimetype in MIMETYPE_WHITELIST and subprocess.run(['dcraw', '-i', path]).returncode:
-        logger.error(f'File is not a supported type: {path} ({mimetype})')
-        return None
-
     if type(library) == Library:
         library_id = library.id
     else:
         library_id = str(library)
+
+    # Handle deletions before anything that reads the file - it is already
+    # gone from disk so any filesystem access would raise FileNotFoundError
+    if inotify_event_type in ['DELETE', 'MOVED_FROM']:
+        try:
+            photo_file = PhotoFile.objects.get(path=path)
+        except PhotoFile.DoesNotExist:
+            return True
+        return delete_photo_record(photo_file)
+
+    mimetype = get_mimetype(path)
+
+    if not is_image(path) and not mimetype in MIMETYPE_WHITELIST and subprocess.run(['dcraw', '-i', path]).returncode:
+        logger.error(f'File is not a supported type: {path} ({mimetype})')
+        return None
+
     try:
         photo_file = PhotoFile.objects.get(path=path)
     except PhotoFile.DoesNotExist:
         photo_file = PhotoFile()
-
-    if inotify_event_type in ['DELETE', 'MOVED_FROM']: 
-        if PhotoFile.objects.filter(path=path).exists():
-            return delete_photo_record(photo_file)
-        else:
-            return True
 
     file_modified_at = datetime.fromtimestamp(os.stat(path).st_mtime, tz=utc)
 
@@ -86,7 +101,7 @@ def record_photo(path, library, inotify_event_type=None):
     lens_name = metadata.get('Lens ID')
     if lens_name:
         try:
-            lens = Lens.objects.get(name=lens_name)
+            lens = Lens.objects.get(library_id=library_id, name=lens_name)
             if date_taken < lens.earliest_photo:
                 lens.earliest_photo = date_taken
                 lens.save()
@@ -100,20 +115,25 @@ def record_photo(path, library, inotify_event_type=None):
 
     photo = None
     if date_taken:
-        try:
-            # Fix for issue 347: Photos with the same date are not imported ...
-            photo_set = Photo.objects.filter(taken_at=date_taken)
-            file_found = False
-            if photo_set:
-                for photo_entry in photo_set:
-                    if PhotoFile.objects.get(photo_id=photo_entry).base_image_path == path:
-                        file_found = True
+        # Reuse an existing photo from the same library taken at the same
+        # instant: either one that already references this exact file, or one
+        # with a same-named counterpart file (e.g. a raw + JPEG pair).
+        # Distinct photos that merely share a timestamp stay separate
+        # (issue #347).
+        photo_set = Photo.objects.filter(library_id=library_id, taken_at=date_taken)
+        for photo_entry in photo_set:
+            if photo_entry.files.filter(path=path).exists():
+                photo = photo_entry
+                break
+        if not photo:
+            file_stem = os.path.splitext(os.path.basename(path))[0]
+            for photo_entry in photo_set:
+                for photo_file_entry in photo_entry.files.all():
+                    if os.path.splitext(os.path.basename(photo_file_entry.path))[0] == file_stem:
                         photo = photo_entry
                         break
-            if not file_found:
-                photo = None
-        except Photo.DoesNotExist:
-            pass
+                if photo:
+                    break
 
     latitude = None
     longitude = None
@@ -169,9 +189,12 @@ def record_photo(path, library, inotify_event_type=None):
                     confidence=1.0
             )
     else:
-        for photo_file in photo.files.all():
-            if not os.path.exists(photo_file.path):
-                photo_file.delete()
+        # Note: must not reuse the photo_file variable here or the new file
+        # below would overwrite an existing PhotoFile row instead of being
+        # added as an additional file of this photo
+        for existing_photo_file in photo.files.all():
+            if not os.path.exists(existing_photo_file.path):
+                existing_photo_file.delete()
 
     # Store original file dimensions (pre-rotation). Display dimensions are
     # calculated at query time by swapping based on total rotation.
@@ -244,6 +267,55 @@ def delete_child_dir_all_photos(directory_path, library_id):
 def delete_photofile_and_photo_record(photo_file_obj):
     """Delete photoFile object with its photo object."""
     photo_obj = photo_file_obj.photo
+    # Clean up cached thumbnail files for this PhotoFile
+    _cleanup_photofile_thumbnails(photo_file_obj)
     photo_file_obj.delete()
     if not photo_obj.files.all():
         photo_obj.delete()
+
+
+def _cleanup_photofile_thumbnails(photo_file_obj):
+    """Remove cached thumbnail files for a PhotoFile from disk."""
+    from django.conf import settings
+    from pathlib import Path
+    import glob
+
+    thumbnail_root = Path(settings.THUMBNAIL_ROOT) / 'photofile'
+    if not thumbnail_root.exists():
+        return
+
+    # Thumbnails are stored as {photofile_id}.jpg in size-specific subdirectories
+    photo_file_id = str(photo_file_obj.id)
+    for size_dir in thumbnail_root.iterdir():
+        if size_dir.is_dir():
+            thumb_path = size_dir / f'{photo_file_id}.jpg'
+            if thumb_path.exists():
+                thumb_path.unlink()
+                logger.info(f'Removed stale thumbnail: {thumb_path}')
+
+
+def cleanup_orphaned_photofiles(library=None):
+    """Remove PhotoFile records whose source files no longer exist on disk,
+    along with their cached thumbnails. Also removes Photo records that
+    have no remaining PhotoFiles."""
+    from photonix.photos.models import PhotoFile, Photo, Tag, Camera, Lens
+
+    photofiles = PhotoFile.objects.all()
+    if library:
+        photofiles = photofiles.filter(photo__library=library)
+
+    orphaned_count = 0
+    for photo_file in photofiles.iterator():
+        if not os.path.exists(photo_file.path):
+            logger.info(f'Cleaning up orphaned PhotoFile: {photo_file.path}')
+            delete_photofile_and_photo_record(photo_file)
+            orphaned_count += 1
+
+    if orphaned_count:
+        # Clean up any tags, cameras, or lenses with no remaining photos
+        Tag.objects.filter(photo_tags=None).delete()
+        Camera.objects.filter(photos=None).delete()
+        Lens.objects.filter(photos=None).delete()
+        logger.info(f'Cleaned up {orphaned_count} orphaned PhotoFile(s)')
+
+    return orphaned_count

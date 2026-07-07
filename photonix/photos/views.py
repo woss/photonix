@@ -1,9 +1,11 @@
 import hashlib
 import math
+import os
 from pathlib import Path
+from urllib.parse import quote
 
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseNotFound, JsonResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseNotFound, HttpResponseRedirect, FileResponse
 from django.shortcuts import get_object_or_404
 from PIL import Image, ImageFile
 
@@ -41,19 +43,27 @@ def thumbnailer(request, type, id, width, height, crop, quality):
     return response
 
 
-def upload(request):
-    if 'library_id' not in request.GET:
-        return JsonResponse({'ok': False, 'message': 'library_id must be supplied as GET parameter'}, status=400)
-    user = request.user
-    lib = get_object_or_404(Library, id=request.GET['library_id'], user=user)
-    libpath = lib.paths.all()[0]
-    for fn, file in request.FILES.items():
-        dest = Path(libpath.path) / fn
-        with open(dest, 'wb+') as destination:
-            print(f'Writing to {dest}')
-            for chunk in file.chunks():
-                destination.write(chunk)
-    return JsonResponse({'ok': True})
+def photo_download(request, photo_id):
+    # Originals are served via this unguessable (uuid4) per-photo URL rather than
+    # their real, enumerable filename. Nginx serves the file directly through an
+    # internal X-Accel-Redirect so large originals don't stream through the app.
+    photo = get_object_or_404(Photo, id=photo_id)
+    base_file = photo.base_file
+    if not base_file or not str(base_file.path).startswith('/data'):
+        return HttpResponseNotFound('Photo not available for download')
+    real_path = str(base_file.path)
+    filename = os.path.basename(real_path)
+
+    if os.environ.get('ENV') == 'test':
+        # No Nginx in the test harness, so stream the file directly.
+        return FileResponse(open(real_path, 'rb'), as_attachment=True, filename=filename)
+
+    # The internal /photos Nginx location maps the /data-relative path to disk.
+    internal_url = quote(real_path.split('/data', 1)[1])
+    response = HttpResponse(content_type='')
+    response['X-Accel-Redirect'] = internal_url
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
+    return response
 
 
 def dummy_thumbnail_response(request, path):

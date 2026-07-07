@@ -1,7 +1,7 @@
 import os
 import shutil
 from hashlib import md5
-from io import StringIO
+from io import BytesIO
 
 from PIL import Image
 
@@ -72,12 +72,12 @@ def determine_same_file(origpath, destpath, fhc=None):
     if os.path.splitext(origpath)[1][1:].lower() in ['jpg', 'jpeg', 'png', ]:
         orig_hash = fhc.get_file_hash(origpath, 'image')
         if not orig_hash:
-            orig_hash = md5(Image.open(StringIO(fhc.get_file(origpath, 'orig'))).tobytes()).hexdigest()
+            orig_hash = md5(Image.open(BytesIO(fhc.get_file(origpath, 'orig'))).tobytes()).hexdigest()
             fhc.set_file_hash(origpath, 'image', orig_hash)
 
         dest_hash = fhc.get_file_hash(destpath, 'image')
         if not dest_hash:
-            dest_hash = md5(Image.open(StringIO(fhc.get_file(destpath, 'dest'))).tobytes()).hexdigest()
+            dest_hash = md5(Image.open(BytesIO(fhc.get_file(destpath, 'dest'))).tobytes()).hexdigest()
             fhc.set_file_hash(destpath, 'image', dest_hash)
 
         if orig_hash == dest_hash:
@@ -94,7 +94,7 @@ def blacklisted_type(file):
         return True
     return False
 
-def import_photos_from_dir(orig, move=False):
+def import_photos_from_dir(orig, library, move=False):
     imported = 0
     were_duplicates = 0
     were_bad = 0
@@ -127,26 +127,28 @@ def import_photos_from_dir(orig, move=False):
                             shutil.move(filepath, destpath)
                         else:
                             shutil.copyfile(filepath, destpath)
-                        record_photo(destpath)
+                        record_photo(destpath, library)
                         imported += 1
                         print('IMPORTED  {} -> {}'.format(filepath, destpath))
                     else:
                         print('PATH EXISTS  {} -> {}'.format(filepath, destpath))
                         same = determine_same_file(filepath, destpath)
-                        print('PHOTO IS THE SAME')
                         if same:
+                            print('PHOTO IS THE SAME')
                             if move:
                                 os.remove(filepath)
                                 were_duplicates += 1
                                 print('DELETED FROM SOURCE')
                         else:
                             print('NEED TO IMPORT UNDER DIFFERENT NAME')
-                            exit(1)
                             destpath = find_new_file_name(destpath)
-                            shutil.move(filepath, destpath)
-                            record_photo(destpath)
+                            if move:
+                                shutil.move(filepath, destpath)
+                            else:
+                                shutil.copyfile(filepath, destpath)
+                            record_photo(destpath, library)
                             imported += 1
-                            # print 'IMPORTED  {} -> {}'.format(filepath, destpath)
+                            print('IMPORTED  {} -> {}'.format(filepath, destpath))
 
                 else:
                     print('ERROR READING DATE: {}'.format(filepath))

@@ -1,6 +1,14 @@
+import os
+import shutil
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
+from photonix.photos.utils.db import record_photo
 from photonix.photos.utils.metadata import PhotoMetadata, parse_gps_location, get_datetime
+from .factories import LibraryFactory
 
 
 def test_metadata():
@@ -20,11 +28,17 @@ def test_metadata():
 
 
 def test_location():
-    # Conversion from GPS exif data to latitude/longitude
+    # Conversion from GPS exif data to latitude/longitude using
+    # degrees + minutes/60 + seconds/3600
     gps_position = '64 deg 9\' 0.70" N, 21 deg 56\' 3.47" W'
     latitude, longitude = parse_gps_location(gps_position)
-    assert latitude == 64.15011666666668
-    assert longitude == -21.933911666666667
+    assert latitude == pytest.approx(64.15019444444445, abs=1e-9)
+    assert longitude == pytest.approx(-21.934297222222224, abs=1e-9)
+
+    gps_position = '33 deg 51\' 25.20" S, 151 deg 12\' 54.50" E'
+    latitude, longitude = parse_gps_location(gps_position)
+    assert latitude == pytest.approx(-(33 + 51 / 60 + 25.20 / 3600), abs=1e-9)
+    assert longitude == pytest.approx(151 + 12 / 60 + 54.50 / 3600, abs=1e-9)
 
 
 def test_datetime():
@@ -52,4 +66,109 @@ def test_datetime():
     # Some of the date digits are the letter X so fall back to file creation date
     photo_path = str(Path(__file__).parent / 'photos' / 'unreadable_date.jpg')
     parsed_datetime = get_datetime(photo_path)
-    assert parsed_datetime.isoformat() == '2021-09-02T10:43:49.739248+00:00'
+    # Falls back to file ctime, so just verify it's a valid datetime
+    # and not the unreadable EXIF date
+    file_ctime = datetime.fromtimestamp(os.stat(photo_path).st_ctime, tz=timezone.utc)
+    assert parsed_datetime == file_ctime
+
+
+@pytest.mark.django_db
+def test_record_photo_delete_event_for_missing_file():
+    """DELETE/MOVED_FROM events arrive after the file is gone from disk so
+    record_photo must not attempt to read it (P1.2)."""
+    library = LibraryFactory()
+    missing_path = '/data/photos/does-not-exist.jpg'
+    assert record_photo(missing_path, library, 'DELETE') is True
+    assert record_photo(missing_path, library, 'MOVED_FROM') is True
+
+
+@pytest.mark.django_db
+def test_record_photo_delete_event_removes_record():
+    from photonix.photos.models import Photo, PhotoFile
+
+    library = LibraryFactory()
+    snow_path = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = os.path.join(tmp_dir, 'snow.jpg')
+        shutil.copy2(snow_path, path)
+        photo = record_photo(path, library)
+        assert PhotoFile.objects.filter(path=path).exists()
+
+        os.remove(path)
+        assert record_photo(path, library, 'DELETE') is True
+        assert not PhotoFile.objects.filter(path=path).exists()
+        assert not Photo.objects.filter(id=photo.id).exists()
+
+
+@pytest.mark.django_db
+def test_duplicate_date_photos():
+    """Photos with same date should not be treated as duplicates (fix #347)."""
+    library = LibraryFactory()
+    snow_path = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path_photo1 = os.path.join(tmp_dir, 'photo_no_metadata_1.jpg')
+        path_photo2 = os.path.join(tmp_dir, 'photo_no_metadata_2.jpg')
+        shutil.copy2(snow_path, path_photo1)
+        shutil.copy2(snow_path, path_photo2)
+
+        photo1 = record_photo(path_photo1, library)
+        photo2 = record_photo(path_photo2, library)
+
+        assert photo1 != photo2
+
+
+@pytest.mark.django_db
+def test_same_name_counterpart_files_grouped_into_one_photo():
+    """Files with the same name and timestamp (e.g. a raw + JPEG pair)
+    should become one Photo with multiple PhotoFiles, not two Photos."""
+    library = LibraryFactory()
+    other_library = LibraryFactory()
+    snow_path = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path_a = os.path.join(tmp_dir, 'IMG_1000.jpg')
+        path_b = os.path.join(tmp_dir, 'IMG_1000.jpeg')
+        shutil.copy2(snow_path, path_a)
+        shutil.copy2(snow_path, path_b)
+
+        photo_a = record_photo(path_a, library)
+        photo_b = record_photo(path_b, library)
+
+        assert photo_a.id == photo_b.id
+        assert photo_a.files.count() == 2
+
+        # The same-date lookup must not match photos in other libraries
+        path_c = os.path.join(tmp_dir, 'IMG_1000_other.jpg')
+        shutil.copy2(snow_path, path_c)
+        photo_c = record_photo(path_c, other_library)
+        assert photo_c.library_id == other_library.id
+        assert photo_c.id != photo_a.id
+
+
+@pytest.mark.django_db
+def test_record_photo_lens_lookup_scoped_to_library():
+    """A lens with the same name in another library must not crash or be
+    attached to this library's photo."""
+    import subprocess
+    from datetime import datetime as dt
+
+    from photonix.photos.models import Lens
+
+    library = LibraryFactory()
+    other_library = LibraryFactory()
+    epoch = dt(2000, 1, 1, tzinfo=timezone.utc)
+    lens_ours = Lens.objects.create(library=library, name='ACME 50mm f/1.8',
+                                    earliest_photo=epoch, latest_photo=epoch)
+    Lens.objects.create(library=other_library, name='ACME 50mm f/1.8',
+                        earliest_photo=epoch, latest_photo=epoch)
+
+    snow_path = str(Path(__file__).parent / 'photos' / 'snow.jpg')
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        path = os.path.join(tmp_dir, 'snow_lens.jpg')
+        shutil.copy2(snow_path, path)
+        subprocess.run(['exiftool', '-LensModel=ACME 50mm f/1.8',
+                        '-overwrite_original', path], check=True)
+        metadata_check = PhotoMetadata(path)
+        assert metadata_check.get('Lens ID') == 'ACME 50mm f/1.8'
+
+        photo = record_photo(path, library)
+        assert photo.lens_id == lens_ours.id

@@ -1,12 +1,23 @@
 #!/bin/sh
+set -e
 
-until nc -z -v -w5 $POSTGRES_HOST 5432; do
+POSTGRES_PORT="${POSTGRES_PORT:-5432}"
+REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
+REDIS_PORT="${REDIS_PORT:-6379}"
+
+until nc -z -v -w5 "$POSTGRES_HOST" "$POSTGRES_PORT"; do
   >&2 echo "Postgres is unavailable - sleeping"
   sleep 1
 done
 
 >&2 echo "Postgres is up"
 
+until nc -z -v -w5 "$REDIS_HOST" "$REDIS_PORT"; do
+  >&2 echo "Redis is unavailable - sleeping"
+  sleep 1
+done
+
+>&2 echo "Redis is up"
 
 >&2 echo "Running migrations"
 python /srv/photonix/manage.py migrate accounts
@@ -29,4 +40,5 @@ python /srv/photonix/manage.py reset_redis_locks
 python /srv/photonix/manage.py housekeeping
 
 >&2 echo "Starting supervisor"
-supervisord -c /etc/supervisord.conf
+# exec so supervisord becomes PID 1 and receives container stop signals
+exec supervisord -c /etc/supervisord.conf

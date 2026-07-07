@@ -26,21 +26,15 @@ class LocationModel(BaseModel):
         self._world_file = str(Path(self.model_dir) / world_file)
         self._cities_file = str(Path(self.model_dir) / cities_file)
         self._lock_name = lock_name
-        self._loaded = False
         self.world = None
         self.cities = None
 
         # Download model files eagerly (cheap), but don't load into memory yet
         self.ensure_downloaded(lock_name=lock_name)
 
-    def _ensure_loaded(self):
-        """Lazy load the model on first use."""
-        if self._loaded:
-            return
-
+    def load(self):
         self.world = self.load_world(self._world_file)
         self.cities = self.load_cities(self._cities_file)
-        self._loaded = True
 
     def load_world(self, world_file):
         return shapefile.Reader(world_file, encoding='latin1').shapeRecords()
@@ -75,7 +69,7 @@ class LocationModel(BaseModel):
         else:
             city = self.get_city(lon=lon, lat=lat)
 
-        if not country and city:
+        if not country and city and city.get('country_name'):
             country = {
                 'name': city['country_name'],
             }
@@ -128,7 +122,9 @@ class LocationModel(BaseModel):
                         largest_population = population
                         largest_city = row[1]
                         chosen_country_code = row[8]
-                        chosen_country_name = countries[chosen_country_code]
+                        # Country codes added after the world borders dataset
+                        # was published (e.g. XK, SS) aren't in it
+                        chosen_country_name = countries.get(chosen_country_code)
 
                 if nearest_distance is None or distance < nearest_distance:
                     nearest_distance = distance
@@ -213,26 +209,22 @@ class LocationModel(BaseModel):
                 break
 
 
+def save_tags(photo, results, model):
+    from photonix.classifiers.runners import get_or_create_tag
+    from photonix.photos.models import PhotoTag
+
+    country_tag = get_or_create_tag(library=photo.library, name=results['country']['name'], type='L', source='C')
+    PhotoTag(photo=photo, tag=country_tag, source='C', confidence=1.0, significance=1.0).save()
+    if results['city']:
+        city_tag = get_or_create_tag(library=photo.library, name=results['city']['name'], type='L', source='C', parent=country_tag)
+        PhotoTag(photo=photo, tag=city_tag, source='C', confidence=0.5, significance=0.5).save()
+
+
 def run_on_photo(photo_id):
-    from photonix.classifiers.model_manager import get_model_manager
-
-    # Get or lazily load the model via ModelManager
-    model = get_model_manager().get_model('location', LocationModel)
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from photonix.classifiers.runners import results_for_model_on_photo, get_or_create_tag
-    photo, results = results_for_model_on_photo(model, photo_id)
-
-    if photo and results['country']:
-        from photonix.photos.models import PhotoTag
-        photo.clear_tags(source='C', type='L')
-        country_tag = get_or_create_tag(library=photo.library, name=results['country']['name'], type='L', source='C')
-        PhotoTag(photo=photo, tag=country_tag, source='C', confidence=1.0, significance=1.0).save()
-        if results['city']:
-            city_tag = get_or_create_tag(library=photo.library, name=results['city']['name'], type='L', source='C', parent=country_tag)
-            PhotoTag(photo=photo, tag=city_tag, source='C', confidence=0.5, significance=0.5).save()
-
-    return photo, results
+    from photonix.classifiers.runners import run_classifier_on_photo
+    # No country means no GPS position was found - keep any existing tags
+    return run_classifier_on_photo('location', LocationModel, photo_id, 'L', save_tags,
+                                   has_results=lambda results: bool(results['country']))
 
 
 if __name__ == '__main__':

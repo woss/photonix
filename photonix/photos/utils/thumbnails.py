@@ -21,7 +21,8 @@ def process_generate_thumbnails_tasks():
 
 
 def generate_thumbnails_for_photo(photo, task):
-    task.start()
+    if not task.claim():
+        return  # Another processor replica claimed this task first
 
     if not isinstance(photo, Photo):
         try:
@@ -94,12 +95,12 @@ def get_thumbnail(photo_file=None, photo=None, width=256, height=256, crop='cove
 
     # Crop / resize
     if force_accurate:
-        im = srgbResize(im, (width, height), crop, Image.BICUBIC)
+        im = srgbResize(im, (width, height), crop, Image.Resampling.BICUBIC)
     else:
         if crop == 'cover':
-            im = ImageOps.fit(im, (width, height), Image.BICUBIC)
+            im = ImageOps.fit(im, (width, height), Image.Resampling.BICUBIC)
         else:
-            im.thumbnail((width, height), Image.BICUBIC)
+            im.thumbnail((width, height), Image.Resampling.BICUBIC)
 
     # Save to disk (keeping the bytes in memory if we need to return them)
     if return_type == 'bytes':
