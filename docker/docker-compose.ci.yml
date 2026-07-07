@@ -1,0 +1,8 @@
+# Overrides for CI e2e runs: skip demo/sample photo downloads at startup —
+# the Playwright specs create their own users and photos.
+# Usage: docker compose -f docker/docker-compose.dev.yml -f docker/docker-compose.ci.yml up -d
+services:
+  photonix:
+    environment:
+      DEMO: 0
+      SAMPLE_DATA: 0
