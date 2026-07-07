@@ -101,13 +101,35 @@ export function SearchBar() {
 
   const hasContent = searchText || selectedFilters.length > 0
 
+  // Touch swipe on the search bar expands (down) / collapses (up) the filters
+  // panel, mirroring master's swipeable search area.
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0]
+    touchStart.current = { x: t.clientX, y: t.clientY }
+  }
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart.current) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - touchStart.current.x
+    const dy = t.clientY - touchStart.current.y
+    touchStart.current = null
+    if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx)) {
+      setShowFilters(dy > 0)
+    }
+  }
+
   return (
     <div
       ref={containerRef}
       className="relative bg-neutral-800 rounded-b-lg px-2 py-1"
       data-testid="search-bar"
     >
-      <div className="flex items-center gap-2 flex-wrap">
+      <div
+        className="flex items-center gap-2 flex-wrap"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <Search className="w-5 h-5 text-neutral-400 shrink-0" />
 
         {/* Filter pills */}
