@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useApolloClient } from '@apollo/client/react'
 import type { DocumentNode } from '@apollo/client'
 import { Bell, Pause, Play } from 'lucide-react'
@@ -7,6 +7,7 @@ import {
   GET_TASK_PROGRESS,
   type TaskCount,
 } from '../../lib/notifications/graphql'
+import { useTaskPeaksStore } from '../../lib/notifications/peaks-store'
 import {
   GET_LIBRARY_SETTING,
   UPDATE_COLOR_ENABLED,
@@ -92,10 +93,24 @@ export function Notifications() {
   const library = settingData?.librarySetting?.library
 
   const progress = data?.taskProgress
-  const activeTasks = TASKS.map((task) => ({
-    ...task,
-    remaining: remainingOf(progress?.[task.key]),
-  })).filter((t) => t.remaining > 0)
+  const peaks = useTaskPeaksStore((s) => s.peaks)
+  const recordPeak = useTaskPeaksStore((s) => s.record)
+
+  // Record the peak remaining per task as new poll data arrives so we can show
+  // a determinate progress bar.
+  useEffect(() => {
+    if (!progress) return
+    for (const task of TASKS) {
+      recordPeak(task.key, remainingOf(progress[task.key]))
+    }
+  }, [progress, recordPeak])
+
+  const activeTasks = TASKS.map((task) => {
+    const remaining = remainingOf(progress?.[task.key])
+    const total = Math.max(peaks[task.key] ?? 0, remaining)
+    const percent = total > 0 ? ((total - remaining) / total) * 100 : 0
+    return { ...task, remaining, total, percent }
+  }).filter((t) => t.remaining > 0)
 
   const hasActive = activeTasks.length > 0
 
@@ -147,7 +162,7 @@ export function Notifications() {
                       className="text-neutral-400 tabular-nums"
                       data-testid={`task-remaining-${task.key}`}
                     >
-                      {task.remaining} left
+                      {task.total - task.remaining}/{task.total}
                     </span>
                     {task.settingKey && (
                       <button
@@ -170,17 +185,15 @@ export function Notifications() {
                   </span>
                 </div>
                 <div className="mt-1 h-1.5 w-full rounded-full bg-neutral-700 overflow-hidden">
-                  <div className="h-full w-1/3 rounded-full bg-teal-500 animate-[taskslide_1.3s_ease-in-out_infinite]" />
+                  <div
+                    className="h-full rounded-full bg-teal-500 transition-all duration-500"
+                    style={{ width: `${task.percent}%` }}
+                    data-testid={`task-bar-${task.key}`}
+                  />
                 </div>
               </li>
             ))}
           </ul>
-          <style>{`
-            @keyframes taskslide {
-              0% { transform: translateX(-100%); }
-              100% { transform: translateX(300%); }
-            }
-          `}</style>
         </div>
       )}
     </div>
