@@ -8,6 +8,8 @@ import { setContext } from '@apollo/client/link/context'
 import { ErrorLink } from '@apollo/client/link/error'
 import { CombinedGraphQLErrors } from '@apollo/client/errors'
 import { RetryLink } from '@apollo/client/link/retry'
+import { getMainDefinition } from '@apollo/client/utilities'
+import Cookies from 'js-cookie'
 import { getAccessToken, clearTokens } from './auth/auth-store'
 
 const authLink = setContext((_, { headers }) => {
@@ -19,6 +21,32 @@ const authLink = setContext((_, { headers }) => {
     },
   }
 })
+
+// Django enforces CSRF on the /graphql endpoint (every GraphQL request is a
+// POST). Send the token from the `csrftoken` cookie on each request. This link
+// sits downstream of the RetryLink so that after the first request 403s - the
+// server's csrf_failure view issues the cookie in that response - the retry
+// re-reads the freshly-set cookie and succeeds. The app's initial ENVIRONMENT
+// query bootstraps the cookie before any mutation (e.g. login) is sent.
+const csrfLink = new ApolloLink((operation, forward) => {
+  operation.setContext(
+    ({ headers = {} }: { headers?: Record<string, string> }) => ({
+      headers: {
+        ...headers,
+        'X-CSRFToken': Cookies.get('csrftoken') ?? '',
+      },
+    })
+  )
+  return forward(operation)
+})
+
+const isMutation = (operation: { query: Parameters<typeof getMainDefinition>[0] }) => {
+  const definition = getMainDefinition(operation.query)
+  return (
+    definition.kind === 'OperationDefinition' &&
+    definition.operation === 'mutation'
+  )
+}
 
 const errorLink = new ErrorLink(({ error }) => {
   if (CombinedGraphQLErrors.is(error)) {
@@ -38,7 +66,12 @@ const errorLink = new ErrorLink(({ error }) => {
 
 const retryLink = new RetryLink({
   delay: { initial: 500, max: 5000, jitter: true },
-  attempts: { max: 3 },
+  attempts: {
+    max: 3,
+    // Retry queries (e.g. to recover once the CSRF cookie is issued on the
+    // first 403) but never replay mutations, which would repeat side effects.
+    retryIf: (error, operation) => !!error && !isMutation(operation),
+  },
 })
 
 const httpLink = new HttpLink({
@@ -48,5 +81,6 @@ const httpLink = new HttpLink({
 
 export const apolloClient = new ApolloClient({
   cache: new InMemoryCache(),
-  link: ApolloLink.from([authLink, errorLink, retryLink, httpLink]),
+  // csrfLink is placed after retryLink so retries re-read the csrftoken cookie.
+  link: ApolloLink.from([authLink, errorLink, retryLink, csrfLink, httpLink]),
 })
