@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
 import {
+  Menu,
   MoreVertical,
   CircleUser,
   Library,
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react'
 import Logo from '../../assets/logo.svg'
 import { useUIStore } from '../../lib/ui/store'
+import { useLayoutStore } from '../../lib/mobile-app'
 import { Notifications } from '../notifications/Notifications'
 
 interface UserProfile {
@@ -65,15 +67,31 @@ export function Header({
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const openModal = useUIStore((s) => s.openModal)
+  const isMobileApp = useLayoutStore((s) => s.isMobileApp)
+  const safeAreaTop = useLayoutStore((s) => s.safeAreaTop)
 
   useClickOutside(menuRef, () => setIsMenuOpen(false))
 
   const isActiveLibrary = (id: string) => activeLibraryId === id
 
   return (
-    <header className="h-[50px] flex items-center justify-between bg-[#444] z-20 flex-none">
+    <header
+      className="flex items-center justify-between bg-[#444] z-20 flex-none"
+      style={{ height: 50 + safeAreaTop, paddingTop: safeAreaTop }}
+    >
       {/* Logo and brand */}
       <div className="flex items-center mx-2.5 text-white">
+        {/* Inside the native mobile app, a hamburger opens the app's drawer */}
+        {isMobileApp && (
+          <button
+            onClick={() => window.photonix?.openAppMenu?.()}
+            className="p-1 mr-2 cursor-pointer"
+            aria-label="Open app menu"
+            data-testid="app-menu-button"
+          >
+            <Menu className="w-[26px] h-[26px] text-white/90" />
+          </button>
+        )}
         <img
           src={Logo}
           alt="Photonix Logo"

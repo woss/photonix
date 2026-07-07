@@ -8,8 +8,12 @@ import { AuthProvider, useAuth } from './lib/auth/auth-context'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ToastStack } from './components/ui/Toast'
 import { createAppRouter } from './router'
+import { installHostAppHooks } from './lib/mobile-app'
 
 import './index.css'
+
+// window.photonix / window.showSettings for the native mobile/desktop wrappers.
+installHostAppHooks()
 
 function AppWithRouter() {
   const auth = useAuth()
