@@ -127,7 +127,7 @@ export function Header({
               >
                 <CircleUser className="w-6 h-6 mr-2.5 text-white/90" />
                 <div className="flex flex-col min-w-0">
-                  <span className="font-semibold text-sm leading-[18px] truncate">
+                  <span className="font-semibold text-sm leading-[18px] truncate" data-testid="logged-in-user">
                     {profile.username}
                   </span>
                   <span className="text-[10px] leading-3 text-neutral-400 truncate">

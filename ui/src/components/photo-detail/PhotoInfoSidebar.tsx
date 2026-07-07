@@ -124,6 +124,7 @@ export function PhotoInfoSidebar({
 
   return (
     <div
+      data-testid="photo-info-sidebar"
       className="absolute right-0 top-0 bottom-0 w-[350px] max-w-[80vw] bg-black/80 text-white overflow-y-auto z-40"
       style={{
         animation: 'slideInRight 300ms ease-out',

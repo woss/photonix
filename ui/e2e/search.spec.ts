@@ -8,13 +8,11 @@ import {
   cleanupTestPhotos,
 } from './test-utils'
 
-let testPhotoIds: string[] = []
-
 test.describe.serial('Search Bar', () => {
   test.beforeAll(async () => {
     setupTestUser()
     // Create photos with various tags for search testing
-    testPhotoIds = createTestPhotos(TEST_USER.username, 5, {
+    createTestPhotos(TEST_USER.username, 5, {
       tags: [
         { name: 'Beach', type: 'L' },
         { name: 'Mountain', type: 'L' },

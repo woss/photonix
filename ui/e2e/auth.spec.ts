@@ -60,7 +60,8 @@ test.describe.serial('Authentication Flow', () => {
     // Should redirect to home page
     await expect(page).toHaveURL('/', { timeout: 10000 })
 
-    // Should show logged in user
+    // Should show logged in user in the header menu
+    await page.getByTestId('header-menu-button').click()
     await expect(page.getByTestId('logged-in-user')).toContainText(
       TEST_USER.username
     )
@@ -87,7 +88,8 @@ test.describe.serial('Authentication Flow', () => {
     // Login using shared helper
     await login(page)
 
-    // Should show logged in user
+    // Should show logged in user in the header menu
+    await page.getByTestId('header-menu-button').click()
     await expect(page.getByTestId('logged-in-user')).toContainText(
       TEST_USER.username
     )
@@ -97,6 +99,7 @@ test.describe.serial('Authentication Flow', () => {
 
     // Should still be logged in
     await expect(page).toHaveURL('/')
+    await page.getByTestId('header-menu-button').click()
     await expect(page.getByTestId('logged-in-user')).toContainText(
       TEST_USER.username
     )

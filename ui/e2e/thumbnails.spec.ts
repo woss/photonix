@@ -61,6 +61,9 @@ test.describe.serial('Thumbnails Grid', () => {
     const grid = page.getByTestId('thumbnails-grid')
     await expect(grid).toBeVisible()
 
+    // Wait for the seeded photos to render before scraping the display order
+    await expect(page.getByTestId(`thumbnail-${testPhotoIds[0]}`)).toBeVisible()
+
     // Get the displayed order of thumbnails on the page
     const displayedIds = await page.locator('[data-testid^="thumbnail-"]').evaluateAll(
       (elements) => elements
@@ -123,6 +126,9 @@ test.describe.serial('Thumbnails Grid', () => {
     const grid = page.getByTestId('thumbnails-grid')
     await expect(grid).toBeVisible()
 
+    // Wait for the seeded photos to render before using select-all
+    await expect(page.getByTestId(`thumbnail-${testPhotoIds[0]}`)).toBeVisible()
+
     // Press Ctrl+A
     await page.keyboard.press('Control+a')
 
@@ -139,6 +145,9 @@ test.describe.serial('Thumbnails Grid', () => {
 
     const grid = page.getByTestId('thumbnails-grid')
     await expect(grid).toBeVisible()
+
+    // Wait for the seeded photos to render before using select-all
+    await expect(page.getByTestId(`thumbnail-${testPhotoIds[0]}`)).toBeVisible()
 
     // Select all first
     await page.keyboard.press('Control+a')
@@ -178,6 +187,12 @@ test.describe.serial('Thumbnails Grid', () => {
     // Click on the 3rd star to set rating
     const stars = starRating.locator('svg')
     await stars.nth(2).click()
+
+    // Saving the rating refetches the filter facets and re-renders the grid,
+    // which drops the hover state — hover again before asserting
+    await page.mouse.move(0, 0)
+    await thumbnail.hover()
+    await expect(starRating).toBeVisible({ timeout: 5000 })
 
     // Verify the star is now filled (rating should persist)
     // After clicking, the first 3 stars should be filled

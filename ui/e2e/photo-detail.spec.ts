@@ -131,7 +131,7 @@ test.describe.serial('Photo Detail Page', () => {
     await expect(carousel).toBeVisible({ timeout: 10000 })
 
     // Initially sidebar should not be visible
-    const sidebar = page.locator('text=Rating')
+    const sidebar = page.getByTestId('photo-info-sidebar')
     await expect(sidebar).not.toBeVisible()
 
     // Press I to toggle info
@@ -212,7 +212,7 @@ test.describe.serial('Photo Detail Page', () => {
     await infoButton.click()
 
     // Sidebar should appear
-    const sidebar = page.locator('text=Rating')
+    const sidebar = page.getByTestId('photo-info-sidebar')
     await expect(sidebar).toBeVisible({ timeout: 3000 })
 
     // Info button should now be X (close)
@@ -373,6 +373,9 @@ test.describe.serial('Photo Detail Page', () => {
     // Wait for grid with photos
     const grid = page.getByTestId('thumbnails-grid')
     await expect(grid).toBeVisible()
+
+    // Wait for thumbnails to render before scraping their IDs
+    await expect(page.locator('[data-id]').first()).toBeVisible({ timeout: 10000 })
 
     // Get all displayed photo IDs
     const displayedIds = await page.locator('[data-id]').evaluateAll(

@@ -9,7 +9,6 @@ import {
 
 // Photo IDs created for this test
 let photoWithBoxesId: string
-let photoWithoutBoxesId: string
 
 // Helper to create test photos with bounding boxes
 function createPhotosWithBoundingBoxes(username: string): { withBoxes: string; withoutBoxes: string } {
@@ -145,7 +144,6 @@ test.describe.serial('Bounding Boxes', () => {
     setupTestUser()
     const ids = createPhotosWithBoundingBoxes(TEST_USER.username)
     photoWithBoxesId = ids.withBoxes
-    photoWithoutBoxesId = ids.withoutBoxes
   })
 
   test.afterAll(async () => {
@@ -290,7 +288,7 @@ test.describe.serial('Bounding Boxes', () => {
     await page.keyboard.press('i')
 
     // Wait for sidebar to appear
-    const ratingHeading = page.locator('text=Rating')
+    const ratingHeading = page.getByTestId('photo-info-sidebar')
     await expect(ratingHeading).toBeVisible({ timeout: 3000 })
 
     // Count filled stars (photo 1 has star_rating=3)
@@ -485,11 +483,11 @@ test.describe.serial('Bounding Boxes', () => {
     await page.keyboard.press('i')
 
     // Wait for sidebar to fully render
-    const ratingHeading = page.locator('text=Rating')
+    const ratingHeading = page.getByTestId('photo-info-sidebar')
     await expect(ratingHeading).toBeVisible({ timeout: 5000 })
 
     // Find and click the "Hide bounding boxes" button (uses title attribute as accessible name)
-    const hideButton = page.getByRole('button', { name: 'Hide bounding boxes' })
+    const hideButton = page.getByRole('button', { name: 'Hide object boxes' })
     await expect(hideButton).toBeVisible({ timeout: 5000 })
     await hideButton.click()
 
@@ -497,7 +495,7 @@ test.describe.serial('Bounding Boxes', () => {
     await expect(boundingBoxLabel).not.toBeVisible({ timeout: 3000 })
 
     // Find and click "Show bounding boxes" button
-    const showButton = page.getByRole('button', { name: 'Show bounding boxes' })
+    const showButton = page.getByRole('button', { name: 'Show object boxes' })
     await expect(showButton).toBeVisible({ timeout: 5000 })
     await showButton.click()
 
