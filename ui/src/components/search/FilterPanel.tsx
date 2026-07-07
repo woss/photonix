@@ -41,6 +41,9 @@ export function FilterPanel() {
   const { data } = useQuery(GET_FILTER_FACETS, {
     variables: { libraryId: activeLibraryId!, multiFilter },
     skip: !activeLibraryId,
+    // Refresh on every open so edits made elsewhere (ratings, tags, face
+    // renames) are reflected without a reload.
+    fetchPolicy: 'cache-and-network',
   })
 
   const numericFacets = useMemo<NumericFacet[]>(() => {

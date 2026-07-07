@@ -85,6 +85,9 @@ export function useAutocomplete() {
       multiFilter,
     },
     skip: !activeLibraryId,
+    // Refresh on remount so edits made elsewhere (tags, face renames) are
+    // reflected in autocomplete without a reload.
+    fetchPolicy: 'cache-and-network',
   })
 
   // Transform and filter options
