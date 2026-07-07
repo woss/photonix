@@ -1,13 +1,20 @@
 import { useCallback, useMemo, useState, useEffect } from 'react'
-import { useQuery } from '@apollo/client/react'
+import { useQuery, useApolloClient } from '@apollo/client/react'
 import { useNavigate } from '@tanstack/react-router'
 import { Thumbnail } from './Thumbnail'
+import { FabMenu } from './FabMenu'
+import { AddTagModal } from './AddTagModal'
 import { useKeyboardSelection } from './hooks/useKeyboardSelection'
 import { useInfiniteScroll } from './hooks/useInfiniteScroll'
 import { useLibrariesStore } from '../../lib/libraries'
 import { usePhotoFilters } from '../../lib/search'
 import { usePhotoListStore } from '../../lib/photos/photo-list-store'
 import { GET_PHOTOS, PHOTOS_PER_PAGE } from '../../lib/photos/graphql'
+import { SET_PHOTOS_DELETED } from '../../lib/photos/batch-graphql'
+import {
+  ASSIGN_TAG_TO_PHOTOS,
+  REMOVE_PHOTOS_FROM_ALBUM,
+} from '../../lib/albums/graphql'
 import type { ThumbnailPhoto, PhotoEdge, AllPhotosResponse } from '../../lib/photos/types'
 
 interface ThumbnailsProps {
@@ -20,12 +27,14 @@ export function Thumbnails({ albumId }: ThumbnailsProps = {}) {
   const baseFilters = usePhotoFilters()
   const filters = albumId ? `${baseFilters} tag:${albumId}` : baseFilters
   const navigate = useNavigate()
+  const client = useApolloClient()
   const { setPhotoList, saveScrollPosition, scrollPosition } = usePhotoListStore()
 
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null)
+  const [batchModal, setBatchModal] = useState<'tag' | 'album' | null>(null)
 
-  const { data, loading, fetchMore } = useQuery(GET_PHOTOS, {
+  const { data, loading, fetchMore, refetch } = useQuery(GET_PHOTOS, {
     variables: { filters, first: PHOTOS_PER_PAGE },
     skip: !filters.includes('library_id:'),
   })
@@ -101,6 +110,48 @@ export function Thumbnails({ albumId }: ThumbnailsProps = {}) {
     setSelectedIds([])
     setLastSelectedId(null)
   }, [])
+
+  // Long-press on touch enters/toggles selection.
+  const handleLongPress = useCallback(
+    (photoId: string) => {
+      toggleSelection(photoId)
+    },
+    [toggleSelection]
+  )
+
+  // --- Batch actions -------------------------------------------------------
+
+  const assignTag = useCallback(
+    async (name: string, tagType: string) => {
+      if (selectedIds.length === 0) return
+      await client.mutate({
+        mutation: ASSIGN_TAG_TO_PHOTOS,
+        variables: { name, photoIds: selectedIds.join(','), tagType },
+      })
+      clearSelection()
+    },
+    [client, selectedIds, clearSelection]
+  )
+
+  const handleDelete = useCallback(async () => {
+    if (selectedIds.length === 0) return
+    await client.mutate({
+      mutation: SET_PHOTOS_DELETED,
+      variables: { photoIds: selectedIds.join(',') },
+    })
+    clearSelection()
+    refetch()
+  }, [client, selectedIds, clearSelection, refetch])
+
+  const handleRemoveFromAlbum = useCallback(async () => {
+    if (selectedIds.length === 0 || !albumId) return
+    await client.mutate({
+      mutation: REMOVE_PHOTOS_FROM_ALBUM,
+      variables: { photoIds: selectedIds.join(','), albumId },
+    })
+    clearSelection()
+    refetch()
+  }, [client, selectedIds, albumId, clearSelection, refetch])
 
   const { ctrlKeyPressed, shiftKeyPressed } = useKeyboardSelection({
     onSelectAll: selectAll,
@@ -188,22 +239,55 @@ export function Thumbnails({ albumId }: ThumbnailsProps = {}) {
   }
 
   return (
-    <ul
-      className="m-0 p-10 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-5 max-md:p-5 max-md:grid-cols-[repeat(auto-fill,minmax(100px,1fr))] max-sm:p-2.5 max-sm:grid-cols-[repeat(auto-fill,minmax(90px,1fr))] max-sm:gap-2.5"
-      data-testid="thumbnails-grid"
-    >
-      {photos.map((photo) => (
-        <Thumbnail
-          key={photo.id}
-          photo={photo}
-          isSelected={selectedIds.includes(photo.id)}
-          isSelectable={showSelectable}
-          onMouseDown={handleMouseDown(photo.id)}
-          onClick={handleClick(photo.id)}
-        />
-      ))}
+    <>
+      <ul
+        className="m-0 p-10 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-5 max-md:p-5 max-md:grid-cols-[repeat(auto-fill,minmax(100px,1fr))] max-sm:p-2.5 max-sm:grid-cols-[repeat(auto-fill,minmax(90px,1fr))] max-sm:gap-2.5"
+        data-testid="thumbnails-grid"
+      >
+        {photos.map((photo) => (
+          <Thumbnail
+            key={photo.id}
+            photo={photo}
+            isSelected={selectedIds.includes(photo.id)}
+            isSelectable={showSelectable}
+            onMouseDown={handleMouseDown(photo.id)}
+            onClick={handleClick(photo.id)}
+            onLongPress={() => handleLongPress(photo.id)}
+          />
+        ))}
 
-      <div ref={sentinelRef} className="h-px" aria-hidden="true" />
-    </ul>
+        <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+      </ul>
+
+      {selectedIds.length > 0 && (
+        <FabMenu
+          selectedCount={selectedIds.length}
+          isAlbumView={!!albumId}
+          onAddTag={() => setBatchModal('tag')}
+          onAddAlbum={() => setBatchModal('album')}
+          onRemoveFromAlbum={handleRemoveFromAlbum}
+          onDelete={handleDelete}
+          onClear={clearSelection}
+        />
+      )}
+
+      {batchModal === 'tag' && (
+        <AddTagModal
+          title={`Tag ${selectedIds.length} photo${selectedIds.length === 1 ? '' : 's'}`}
+          label="Tag name"
+          onSubmit={(name) => assignTag(name, 'G')}
+          onClose={() => setBatchModal(null)}
+        />
+      )}
+
+      {batchModal === 'album' && (
+        <AddTagModal
+          title={`Add ${selectedIds.length} photo${selectedIds.length === 1 ? '' : 's'} to album`}
+          label="Album name"
+          onSubmit={(name) => assignTag(name, 'A')}
+          onClose={() => setBatchModal(null)}
+        />
+      )}
+    </>
   )
 }

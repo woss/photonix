@@ -11,7 +11,10 @@ interface ThumbnailProps {
   isSelectable: boolean
   onMouseDown: (e: React.MouseEvent) => void
   onClick: () => void
+  onLongPress?: () => void
 }
+
+const LONG_PRESS_MS = 500
 
 export const Thumbnail = memo(function Thumbnail({
   photo,
@@ -19,11 +22,14 @@ export const Thumbnail = memo(function Thumbnail({
   isSelectable,
   onMouseDown,
   onClick,
+  onLongPress,
 }: ThumbnailProps) {
   const [localRating, setLocalRating] = useState(photo.starRating)
   const [isLoaded, setIsLoaded] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const containerRef = useRef<HTMLLIElement>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressed = useRef(false)
 
   const [updateRating] = useMutation(UPDATE_PHOTO_RATING)
 
@@ -54,6 +60,32 @@ export const Thumbnail = memo(function Thumbnail({
   const canHover =
     typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
 
+  // Touch long-press to enter selection mode.
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch' || !onLongPress) return
+    longPressed.current = false
+    longPressTimer.current = setTimeout(() => {
+      longPressed.current = true
+      onLongPress()
+    }, LONG_PRESS_MS)
+  }
+
+  const handleClickCapture = (e: React.MouseEvent) => {
+    // Swallow the click that follows a long-press so it doesn't navigate.
+    if (longPressed.current) {
+      e.preventDefault()
+      e.stopPropagation()
+      longPressed.current = false
+    }
+  }
+
   return (
     <li
       ref={containerRef}
@@ -64,6 +96,12 @@ export const Thumbnail = memo(function Thumbnail({
       }`}
       onMouseDown={onMouseDown}
       onClick={onClick}
+      onClickCapture={handleClickCapture}
+      onPointerDown={handlePointerDown}
+      onPointerUp={cancelLongPress}
+      onPointerMove={cancelLongPress}
+      onPointerCancel={cancelLongPress}
+      onPointerLeave={cancelLongPress}
     >
       <div
         className={`absolute inset-0 transition-transform duration-100 ease-in-out ${
