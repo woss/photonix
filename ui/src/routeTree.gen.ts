@@ -14,14 +14,17 @@ import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
-import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as OnboardingStep5RouteImport } from './routes/onboarding/step5'
 import { Route as OnboardingStep4RouteImport } from './routes/onboarding/step4'
 import { Route as OnboardingStep3RouteImport } from './routes/onboarding/step3'
 import { Route as OnboardingStep2RouteImport } from './routes/onboarding/step2'
 import { Route as OnboardingStep1RouteImport } from './routes/onboarding/step1'
 import { Route as OnboardingCompleteRouteImport } from './routes/onboarding/complete'
+import { Route as AuthenticatedBrowseRouteImport } from './routes/_authenticated/_browse'
+import { Route as AuthenticatedBrowseIndexRouteImport } from './routes/_authenticated/_browse/index'
 import { Route as AuthenticatedPhotoIdRouteImport } from './routes/_authenticated/photo/$id'
+import { Route as AuthenticatedBrowseMapRouteImport } from './routes/_authenticated/_browse/map'
+import { Route as AuthenticatedBrowseAlbumsRouteImport } from './routes/_authenticated/_browse/albums'
 
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
@@ -46,11 +49,6 @@ const OnboardingIndexRoute = OnboardingIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => OnboardingRoute,
-} as any)
-const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const OnboardingStep5Route = OnboardingStep5RouteImport.update({
   id: '/step5',
@@ -82,14 +80,35 @@ const OnboardingCompleteRoute = OnboardingCompleteRouteImport.update({
   path: '/complete',
   getParentRoute: () => OnboardingRoute,
 } as any)
+const AuthenticatedBrowseRoute = AuthenticatedBrowseRouteImport.update({
+  id: '/_browse',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedBrowseIndexRoute =
+  AuthenticatedBrowseIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedBrowseRoute,
+  } as any)
 const AuthenticatedPhotoIdRoute = AuthenticatedPhotoIdRouteImport.update({
   id: '/photo/$id',
   path: '/photo/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedBrowseMapRoute = AuthenticatedBrowseMapRouteImport.update({
+  id: '/map',
+  path: '/map',
+  getParentRoute: () => AuthenticatedBrowseRoute,
+} as any)
+const AuthenticatedBrowseAlbumsRoute =
+  AuthenticatedBrowseAlbumsRouteImport.update({
+    id: '/albums',
+    path: '/albums',
+    getParentRoute: () => AuthenticatedBrowseRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AuthenticatedIndexRoute
+  '/': typeof AuthenticatedBrowseIndexRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/onboarding': typeof OnboardingRouteWithChildren
@@ -100,9 +119,12 @@ export interface FileRoutesByFullPath {
   '/onboarding/step4': typeof OnboardingStep4Route
   '/onboarding/step5': typeof OnboardingStep5Route
   '/onboarding/': typeof OnboardingIndexRoute
+  '/albums': typeof AuthenticatedBrowseAlbumsRoute
+  '/map': typeof AuthenticatedBrowseMapRoute
   '/photo/$id': typeof AuthenticatedPhotoIdRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof AuthenticatedBrowseIndexRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/onboarding/complete': typeof OnboardingCompleteRoute
@@ -111,8 +133,9 @@ export interface FileRoutesByTo {
   '/onboarding/step3': typeof OnboardingStep3Route
   '/onboarding/step4': typeof OnboardingStep4Route
   '/onboarding/step5': typeof OnboardingStep5Route
-  '/': typeof AuthenticatedIndexRoute
   '/onboarding': typeof OnboardingIndexRoute
+  '/albums': typeof AuthenticatedBrowseAlbumsRoute
+  '/map': typeof AuthenticatedBrowseMapRoute
   '/photo/$id': typeof AuthenticatedPhotoIdRoute
 }
 export interface FileRoutesById {
@@ -121,15 +144,18 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/onboarding': typeof OnboardingRouteWithChildren
+  '/_authenticated/_browse': typeof AuthenticatedBrowseRouteWithChildren
   '/onboarding/complete': typeof OnboardingCompleteRoute
   '/onboarding/step1': typeof OnboardingStep1Route
   '/onboarding/step2': typeof OnboardingStep2Route
   '/onboarding/step3': typeof OnboardingStep3Route
   '/onboarding/step4': typeof OnboardingStep4Route
   '/onboarding/step5': typeof OnboardingStep5Route
-  '/_authenticated/': typeof AuthenticatedIndexRoute
   '/onboarding/': typeof OnboardingIndexRoute
+  '/_authenticated/_browse/albums': typeof AuthenticatedBrowseAlbumsRoute
+  '/_authenticated/_browse/map': typeof AuthenticatedBrowseMapRoute
   '/_authenticated/photo/$id': typeof AuthenticatedPhotoIdRoute
+  '/_authenticated/_browse/': typeof AuthenticatedBrowseIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -145,9 +171,12 @@ export interface FileRouteTypes {
     | '/onboarding/step4'
     | '/onboarding/step5'
     | '/onboarding/'
+    | '/albums'
+    | '/map'
     | '/photo/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/login'
     | '/logout'
     | '/onboarding/complete'
@@ -156,8 +185,9 @@ export interface FileRouteTypes {
     | '/onboarding/step3'
     | '/onboarding/step4'
     | '/onboarding/step5'
-    | '/'
     | '/onboarding'
+    | '/albums'
+    | '/map'
     | '/photo/$id'
   id:
     | '__root__'
@@ -165,15 +195,18 @@ export interface FileRouteTypes {
     | '/login'
     | '/logout'
     | '/onboarding'
+    | '/_authenticated/_browse'
     | '/onboarding/complete'
     | '/onboarding/step1'
     | '/onboarding/step2'
     | '/onboarding/step3'
     | '/onboarding/step4'
     | '/onboarding/step5'
-    | '/_authenticated/'
     | '/onboarding/'
+    | '/_authenticated/_browse/albums'
+    | '/_authenticated/_browse/map'
     | '/_authenticated/photo/$id'
+    | '/_authenticated/_browse/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -220,13 +253,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingIndexRouteImport
       parentRoute: typeof OnboardingRoute
     }
-    '/_authenticated/': {
-      id: '/_authenticated/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/onboarding/step5': {
       id: '/onboarding/step5'
       path: '/step5'
@@ -269,6 +295,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingCompleteRouteImport
       parentRoute: typeof OnboardingRoute
     }
+    '/_authenticated/_browse': {
+      id: '/_authenticated/_browse'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedBrowseRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/_browse/': {
+      id: '/_authenticated/_browse/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedBrowseIndexRouteImport
+      parentRoute: typeof AuthenticatedBrowseRoute
+    }
     '/_authenticated/photo/$id': {
       id: '/_authenticated/photo/$id'
       path: '/photo/$id'
@@ -276,16 +316,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPhotoIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/_browse/map': {
+      id: '/_authenticated/_browse/map'
+      path: '/map'
+      fullPath: '/map'
+      preLoaderRoute: typeof AuthenticatedBrowseMapRouteImport
+      parentRoute: typeof AuthenticatedBrowseRoute
+    }
+    '/_authenticated/_browse/albums': {
+      id: '/_authenticated/_browse/albums'
+      path: '/albums'
+      fullPath: '/albums'
+      preLoaderRoute: typeof AuthenticatedBrowseAlbumsRouteImport
+      parentRoute: typeof AuthenticatedBrowseRoute
+    }
   }
 }
 
+interface AuthenticatedBrowseRouteChildren {
+  AuthenticatedBrowseAlbumsRoute: typeof AuthenticatedBrowseAlbumsRoute
+  AuthenticatedBrowseMapRoute: typeof AuthenticatedBrowseMapRoute
+  AuthenticatedBrowseIndexRoute: typeof AuthenticatedBrowseIndexRoute
+}
+
+const AuthenticatedBrowseRouteChildren: AuthenticatedBrowseRouteChildren = {
+  AuthenticatedBrowseAlbumsRoute: AuthenticatedBrowseAlbumsRoute,
+  AuthenticatedBrowseMapRoute: AuthenticatedBrowseMapRoute,
+  AuthenticatedBrowseIndexRoute: AuthenticatedBrowseIndexRoute,
+}
+
+const AuthenticatedBrowseRouteWithChildren =
+  AuthenticatedBrowseRoute._addFileChildren(AuthenticatedBrowseRouteChildren)
+
 interface AuthenticatedRouteChildren {
-  AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedBrowseRoute: typeof AuthenticatedBrowseRouteWithChildren
   AuthenticatedPhotoIdRoute: typeof AuthenticatedPhotoIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedBrowseRoute: AuthenticatedBrowseRouteWithChildren,
   AuthenticatedPhotoIdRoute: AuthenticatedPhotoIdRoute,
 }
 
