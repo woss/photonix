@@ -109,7 +109,8 @@ def filter_photos_queryset(filters, queryset, library_id=None):
                 )
             elif key == "flash":
                 queryset = queryset.filter(flash=val == "on" and True or False)
-            elif key == "meeteringMode":
+            elif key in ("meteringMode", "meeteringMode"):
+                # Accept both the correct spelling and the historical typo.
                 queryset = queryset.filter(metering_mode=val)
             elif key == "driveMode":
                 queryset = queryset.filter(drive_mode=val)
