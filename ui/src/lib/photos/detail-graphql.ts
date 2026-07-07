@@ -194,6 +194,19 @@ export const GET_PHOTO_FILE_METADATA: TypedDocumentNode<
   }
 `
 
+// Switch which file version a photo displays. The backend re-queues
+// thumbnailing/classification for the new base file.
+export const CHANGE_PREFERRED_PHOTO_FILE: TypedDocumentNode<
+  { changePreferredPhotoFile: { ok: boolean } },
+  { selectedPhotoFileId: string }
+> = gql`
+  mutation ChangePreferredPhotoFile($selectedPhotoFileId: ID!) {
+    changePreferredPhotoFile(selectedPhotoFileId: $selectedPhotoFileId) {
+      ok
+    }
+  }
+`
+
 // Query for photos around a specific photo (for navigation when directly landing on photo detail).
 // multiFilter keeps prev/next navigation within the active search/filter context.
 export const GET_PHOTOS_AROUND: TypedDocumentNode<

@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useMutation } from '@apollo/client/react'
 import { Eye, EyeOff, Edit2, ChevronDown, ChevronUp } from 'lucide-react'
 import { StarRating } from '../thumbnails/StarRating'
 import { ImageHistogram } from './ImageHistogram'
@@ -8,6 +9,8 @@ import { TagList } from './TagList'
 import { MapView } from '../map/MapView'
 import { ColorTags } from './ColorTags'
 import { getPhotoThumbnailUrl, type ThumbnailResolution } from '../../lib/photos/image-cache-store'
+import { CHANGE_PREFERRED_PHOTO_FILE } from '../../lib/photos/detail-graphql'
+import { addToast } from '../../lib/ui/store'
 import type { PhotoDetail } from '../../lib/photos/detail-types'
 
 interface PhotoInfoSidebarProps {
@@ -63,6 +66,23 @@ export function PhotoInfoSidebar({
   const [showAllMetadata, setShowAllMetadata] = useState(false)
   const [tagEditorMode, setTagEditorMode] = useState(false)
   let sectionIndex = 0
+
+  // Version switching: persist the preferred file, then reload so the image,
+  // tiles and metadata all re-request against the new base file.
+  const [changePreferredPhotoFile] = useMutation(CHANGE_PREFERRED_PHOTO_FILE)
+  const handleVersionChange = (selectedPhotoFileId: string) => {
+    changePreferredPhotoFile({ variables: { selectedPhotoFileId } })
+      .then((result) => {
+        if (result.data?.changePreferredPhotoFile.ok) {
+          window.location.reload()
+        } else {
+          addToast("Couldn't switch photo version")
+        }
+      })
+      .catch(() => {
+        addToast("Couldn't switch photo version")
+      })
+  }
 
   // Format date
   const formattedDate = useMemo(() => {
@@ -348,7 +368,12 @@ export function PhotoInfoSidebar({
         {/* Multiple file versions */}
         {photo.photoFile.length > 1 && (
           <Section title="Versions" index={sectionIndex++}>
-            <select className="w-full bg-neutral-700 text-white rounded px-2 py-1 text-sm">
+            <select
+              className="w-full bg-neutral-700 text-white rounded px-2 py-1 text-sm"
+              value={photo.baseFileId ?? undefined}
+              onChange={(e) => handleVersionChange(e.target.value)}
+              data-testid="version-select"
+            >
               {photo.photoFile.map((file) => (
                 <option key={file.id} value={file.id}>
                   {file.path.split('/').pop()}
