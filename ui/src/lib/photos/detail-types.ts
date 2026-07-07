@@ -148,6 +148,14 @@ export interface RemoveGenericTagResponse {
   }
 }
 
+// Full EXIF metadata dump (photoFileMetadata)
+export interface PhotoFileMetadataResponse {
+  photoFileMetadata: {
+    data: Record<string, unknown> | null
+    ok: boolean
+  } | null
+}
+
 // Photos around response for navigation
 export interface PhotosAroundData {
   photoIds: string[]

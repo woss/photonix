@@ -3,6 +3,7 @@ import { Eye, EyeOff, Edit2, ChevronDown, ChevronUp } from 'lucide-react'
 import { StarRating } from '../thumbnails/StarRating'
 import { ImageHistogram } from './ImageHistogram'
 import { EditableTags } from './EditableTags'
+import { PhotoFileMetadata } from './PhotoFileMetadata'
 import { TagList } from './TagList'
 import { ColorTags } from './ColorTags'
 import { getPhotoThumbnailUrl, type ThumbnailResolution } from '../../lib/photos/image-cache-store'
@@ -202,6 +203,13 @@ export function PhotoInfoSidebar({
                   <li className="break-all">
                     <span className="text-white/50">Path:</span>{' '}
                     {photo.photoFile[0].path}
+                  </li>
+                )}
+
+                {/* Full EXIF dump from the backend (every key/value) */}
+                {photo.photoFile[0]?.id && (
+                  <li>
+                    <PhotoFileMetadata photoFileId={photo.photoFile[0].id} />
                   </li>
                 )}
               </>

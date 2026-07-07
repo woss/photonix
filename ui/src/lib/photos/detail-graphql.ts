@@ -9,6 +9,7 @@ import type {
   CreateGenericTagResponse,
   RemoveGenericTagResponse,
   PhotosAroundResponse,
+  PhotoFileMetadataResponse,
 } from './detail-types'
 
 // Query for full photo details
@@ -175,6 +176,19 @@ export const REMOVE_GENERIC_TAG: TypedDocumentNode<
 > = gql`
   mutation RemoveGenericTag($tagId: ID!, $photoId: ID!) {
     removeGenericTag(tagId: $tagId, photoId: $photoId) {
+      ok
+    }
+  }
+`
+
+// Query for the full EXIF metadata dump of a photo file ("Show all")
+export const GET_PHOTO_FILE_METADATA: TypedDocumentNode<
+  PhotoFileMetadataResponse,
+  { photoFileId: string }
+> = gql`
+  query PhotoFileMetadata($photoFileId: UUID) {
+    photoFileMetadata(photoFileId: $photoFileId) {
+      data
       ok
     }
   }
