@@ -1,5 +1,3 @@
-import { create } from 'zustand'
-
 interface ImageCacheEntry {
   width: number
   height: number
@@ -36,20 +34,6 @@ export function clearImageCache(): void {
 export function getImageCacheSize(): number {
   return imageCache.size
 }
-
-// Zustand store just for triggering re-renders when cache changes
-// Components subscribe to this to know when to re-check the cache
-interface ImageCacheStore {
-  // Increment this to trigger re-renders in subscribed components
-  version: number
-  // Notify that cache changed
-  notifyCacheChanged: () => void
-}
-
-export const useImageCacheStore = create<ImageCacheStore>((set) => ({
-  version: 0,
-  notifyCacheChanged: () => set((state) => ({ version: state.version + 1 })),
-}))
 
 // Available thumbnail resolutions
 export type ThumbnailResolution = '1920' | '3840'

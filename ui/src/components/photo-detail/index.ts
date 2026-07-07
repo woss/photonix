@@ -10,5 +10,4 @@ export { FullscreenButton } from './FullscreenButton'
 // Hooks
 export { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 export { useImageRotation } from './hooks/useImageRotation'
-export { usePhotoNavigation } from './hooks/usePhotoNavigation'
 export { useFullscreen } from './hooks/useFullscreen'
