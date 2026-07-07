@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useMutation } from '@apollo/client/react'
+import { useMutation, useApolloClient } from '@apollo/client/react'
 import { useNavigate } from '@tanstack/react-router'
 import { PhotoToolbar } from './PhotoToolbar'
 import { PhotoCarousel, useCarouselNavigation } from './PhotoCarousel'
@@ -12,6 +12,7 @@ import { useCurrentPhotoData } from './hooks/useCurrentPhotoData'
 import { useOptimalResolution } from './hooks/useOptimalResolution'
 import { usePhotoListStore } from '../../lib/photos/photo-list-store'
 import { UPDATE_PHOTO_RATING } from '../../lib/photos/graphql'
+import { SET_PHOTOS_DELETED } from '../../lib/photos/batch-graphql'
 import { addToast } from '../../lib/ui/store'
 import type { PhotoDetail } from '../../lib/photos/detail-types'
 
@@ -78,6 +79,29 @@ export function PhotoDetailView({ photo }: PhotoDetailViewProps) {
   const goToHome = useCallback(() => {
     navigate({ to: '/' })
   }, [navigate])
+
+  // Soft-delete the current photo, then return to the grid. The grid's Photos
+  // query is only refetchable once it's mounted again, so refetch after the
+  // navigation completes.
+  const [setPhotosDeleted] = useMutation(SET_PHOTOS_DELETED)
+  const client = useApolloClient()
+  const handleDelete = useCallback(async () => {
+    if (!window.confirm('Delete this photo?')) return
+    try {
+      const result = await setPhotosDeleted({
+        variables: { photoIds: currentPhoto.id },
+      })
+      if (result.data?.setPhotosDeleted.ok) {
+        addToast('Photo deleted', 'success')
+        await navigate({ to: '/' })
+        void client.refetchQueries({ include: ['Photos'] })
+      } else {
+        addToast("Couldn't delete photo")
+      }
+    } catch {
+      addToast("Couldn't delete photo")
+    }
+  }, [currentPhoto.id, setPhotosDeleted, navigate, client])
 
   const toggleInfo = useCallback(() => {
     setShowInfo((prev) => !prev)
@@ -155,6 +179,7 @@ export function PhotoDetailView({ photo }: PhotoDetailViewProps) {
           downloadUrl={photo.downloadUrl}
           showInfo={showInfo}
           onToggleInfo={toggleInfo}
+          onDelete={handleDelete}
         />
       )}
 

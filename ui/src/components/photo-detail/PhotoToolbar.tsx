@@ -4,6 +4,7 @@ import {
   RotateCw,
   Download,
   Info,
+  Trash2,
   X,
 } from 'lucide-react'
 
@@ -14,6 +15,7 @@ interface PhotoToolbarProps {
   downloadUrl: string | null
   showInfo: boolean
   onToggleInfo: () => void
+  onDelete: () => void
 }
 
 export function PhotoToolbar({
@@ -23,6 +25,7 @@ export function PhotoToolbar({
   downloadUrl,
   showInfo,
   onToggleInfo,
+  onDelete,
 }: PhotoToolbarProps) {
   return (
     <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-3">
@@ -63,6 +66,15 @@ export function PhotoToolbar({
             <Download className="w-6 h-6" />
           </a>
         )}
+
+        <button
+          onClick={onDelete}
+          className="p-2 text-white/90 hover:text-white transition-colors cursor-pointer"
+          title="Delete photo"
+          data-testid="delete-photo"
+        >
+          <Trash2 className="w-6 h-6" />
+        </button>
 
         <button
           onClick={onToggleInfo}
