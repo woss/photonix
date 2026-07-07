@@ -8,6 +8,15 @@ export type FilterType =
   | 'Cameras'
   | 'Lenses'
   | 'Generic Tags'
+  | 'Aperture'
+  | 'Exposure'
+  | 'ISO Speed'
+  | 'Focal Length'
+  | 'Rating'
+  | 'Flash'
+  | 'Metering Mode'
+  | 'Drive Mode'
+  | 'Shooting Mode'
 
 export interface SelectedFilter {
   id: string // e.g., "tag:abc-123" or "camera:xyz-456"
@@ -30,5 +39,9 @@ export interface SearchState {
   setSearchText: (text: string) => void
   addFilter: (filter: SelectedFilter) => void
   removeFilter: (filterId: string) => void
+  // Set (or clear, with null) the single active filter for a `prefix:` facet
+  // such as aperture/flash/meteringMode. Replaces any existing filter with the
+  // same prefix.
+  setPrefixFilter: (prefix: string, filter: SelectedFilter | null) => void
   clearAll: () => void
 }

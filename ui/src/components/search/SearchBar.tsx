@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, SlidersHorizontal } from 'lucide-react'
 import { FilterPill } from './FilterPill'
+import { FilterPanel } from './FilterPanel'
 import { AutocompleteDropdown } from './AutocompleteDropdown'
 import { useSearchStore } from '../../lib/search/store'
 import { useAutocomplete } from '../../lib/search/hooks'
@@ -22,12 +23,8 @@ export function SearchBar() {
 
   const { options } = useAutocomplete()
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
-
-  // Reset active index when options change
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [options])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -46,6 +43,8 @@ export function SearchBar() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value)
     setShowDropdown(true)
+    // Reset the highlighted option as the query (and thus the list) changes.
+    setActiveIndex(0)
   }
 
   const handleSelectOption = useCallback(
@@ -147,6 +146,20 @@ export function SearchBar() {
             <X className="w-5 h-5 text-neutral-400" />
           </button>
         )}
+
+        {/* Filters panel toggle */}
+        <button
+          type="button"
+          onClick={() => setShowFilters((v) => !v)}
+          className={`p-1 rounded transition-colors ${
+            showFilters ? 'text-teal-400' : 'text-neutral-400 hover:bg-neutral-700'
+          }`}
+          aria-label="Toggle filters panel"
+          aria-expanded={showFilters}
+          data-testid="filters-toggle"
+        >
+          <SlidersHorizontal className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Autocomplete dropdown */}
@@ -156,6 +169,9 @@ export function SearchBar() {
         onSelect={handleSelectOption}
         visible={showDropdown && searchText.length > 0}
       />
+
+      {/* Collapsible filters panel */}
+      {showFilters && <FilterPanel />}
     </div>
   )
 }

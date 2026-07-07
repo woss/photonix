@@ -21,5 +21,17 @@ export const useSearchStore = create<SearchState>()((set) => ({
       selectedFilters: state.selectedFilters.filter((f) => f.id !== filterId),
     })),
 
+  setPrefixFilter: (prefix: string, filter: SelectedFilter | null) =>
+    set((state) => {
+      const withoutPrefix = state.selectedFilters.filter(
+        (f) => !f.id.startsWith(`${prefix}:`)
+      )
+      return {
+        selectedFilters: filter
+          ? [...withoutPrefix, filter]
+          : withoutPrefix,
+      }
+    }),
+
   clearAll: () => set({ searchText: '', selectedFilters: [] }),
 }))
