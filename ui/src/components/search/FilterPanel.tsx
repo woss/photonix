@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { useQuery } from '@apollo/client/react'
 import { RangeSlider } from './RangeSlider'
-import { ScrollArea } from '../ui'
 import { useLibrariesStore } from '../../lib/libraries'
 import { useSearchStore } from '../../lib/search/store'
 import { GET_FILTER_FACETS } from '../../lib/search/facets-graphql'
@@ -245,12 +244,11 @@ export function FilterPanel() {
 
   return (
     <div
-      className="border-t border-neutral-700 bg-neutral-800 py-4"
+      className="border-t border-neutral-700 bg-neutral-800"
       data-testid="filter-panel"
     >
       {/* Order mirrors master's FiltersContainer. */}
-      <ScrollArea>
-        <div className="flex h-52 gap-6 px-4">
+      <div className="flex h-52 gap-6 overflow-x-auto p-4">
           {/* Objects */}
           {tagColumn('facet-objects', 'Objects', data.allObjectTags, 'Objects')}
 
@@ -368,8 +366,7 @@ export function FilterPanel() {
                 </div>
               </div>
             ))}
-        </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
