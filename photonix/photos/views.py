@@ -3,11 +3,11 @@ from pathlib import Path
 from urllib.parse import quote
 
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseNotFound, JsonResponse, HttpResponseRedirect, FileResponse
+from django.http import HttpResponse, HttpResponseNotFound, HttpResponseRedirect, FileResponse
 from django.shortcuts import get_object_or_404
 
 from photonix.photos.utils.thumbnails import get_thumbnail
-from photonix.photos.models import Library, Photo
+from photonix.photos.models import Photo
 
 
 def thumbnailer(request, type, id, width, height, crop, quality):
@@ -61,21 +61,6 @@ def photo_download(request, photo_id):
     response['X-Accel-Redirect'] = internal_url
     response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
     return response
-
-
-def upload(request):
-    if 'library_id' not in request.GET:
-        return JsonResponse({'ok': False, 'message': 'library_id must be supplied as GET parameter'}, status=400)
-    user = request.user
-    lib = get_object_or_404(Library, id=request.GET['library_id'], user=user)
-    libpath = lib.paths.all()[0]
-    for fn, file in request.FILES.items():
-        dest = Path(libpath.path) / fn
-        with open(dest, 'wb+') as destination:
-            print(f'Writing to {dest}')
-            for chunk in file.chunks():
-                destination.write(chunk)
-    return JsonResponse({'ok': True})
 
 
 def dummy_thumbnail_response(request, path):
