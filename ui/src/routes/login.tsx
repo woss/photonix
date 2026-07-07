@@ -62,11 +62,12 @@ function LoginPage() {
     }
   }, [envLoading, envData, navigate, setUserId, setLibraryIds])
 
-  // Pre-fill credentials when in demo mode
+  // Pre-fill credentials when in demo mode (without clobbering anything the
+  // user has already typed while the environment query was in flight)
   useEffect(() => {
     if (!credentialsSet && !envLoading && isDemoMode) {
-      setUsername('demo')
-      setPassword('demo')
+      setUsername((current) => current || 'demo')
+      setPassword((current) => current || 'demo')
       setCredentialsSet(true)
     }
   }, [envLoading, isDemoMode, credentialsSet])
