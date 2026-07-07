@@ -3,6 +3,7 @@ import {
   ApolloLink,
   HttpLink,
   InMemoryCache,
+  gql,
 } from '@apollo/client/core'
 import { setContext } from '@apollo/client/link/context'
 import { ErrorLink } from '@apollo/client/link/error'
@@ -84,3 +85,17 @@ export const apolloClient = new ApolloClient({
   // csrfLink is placed after retryLink so retries re-read the csrftoken cookie.
   link: ApolloLink.from([authLink, errorLink, retryLink, csrfLink, httpLink]),
 })
+
+// Bootstrap the CSRF cookie for deep links whose first request is a mutation
+// (e.g. /onboarding/step1): this query 403s without a token, the server's
+// csrf_failure view sets the cookie in that response, and the RetryLink retry
+// succeeds - so the cookie is in place before the user can submit a form.
+if (!Cookies.get('csrftoken')) {
+  apolloClient
+    .query({
+      query: gql`query CsrfBootstrap { __typename }`,
+      // __typename alone resolves from the local cache; force the round-trip
+      fetchPolicy: 'network-only',
+    })
+    .catch(() => {})
+}
