@@ -10,10 +10,13 @@ export const TEST_USER = {
 // Helper to run Django management commands via Docker
 export function runDjangoCommand(pythonCode: string): string {
   const escaped = pythonCode.replace(/"/g, '\\"')
-  return execSync(
+  const output = execSync(
     `docker compose -f docker/docker-compose.dev.yml exec -T photonix python manage.py shell -c "${escaped}"`,
     { cwd: process.cwd() + '/..', encoding: 'utf-8' }
   )
+  // Django 5.2's shell prints an auto-import banner before script output;
+  // strip it so callers can parse printed values
+  return output.replace(/^\d+ objects imported automatically.*$\n?/m, '')
 }
 
 // Helper to create test user with a fully configured library
@@ -126,12 +129,9 @@ export async function login(
   await expect(page).toHaveURL('/', { timeout: 10000 })
 }
 
-// Sample test photos available in the repository
+// Solid color test images for carousel/navigation tests, generated inside the
+// dev container by e2e/global-setup.ts (paths are container paths)
 export const TEST_PHOTOS = {
-  snow: '/home/damian/projects/photonix/tests/photos/snow.jpg',
-  tree: '/home/damian/projects/photonix/tests/photos/tree.jpg',
-  badDate: '/home/damian/projects/photonix/tests/photos/bad_date.jpg',
-  // Solid color test images for carousel/navigation tests
   red: '/data/photos/test_red.jpg',
   green: '/data/photos/test_green.jpg',
   blue: '/data/photos/test_blue.jpg',

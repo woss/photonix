@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
+  // Generates the /data/photos image fixtures inside the dev container
+  globalSetup: './e2e/global-setup.ts',
   // Tests share a single database, so they must run serially
   fullyParallel: false,
   workers: 1,
