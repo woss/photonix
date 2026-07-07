@@ -114,7 +114,16 @@ RUN rm -rf \
     /usr/local/lib/python3.13/site-packages/matplotlib/mpl-data/images \
     /usr/local/lib/python3.13/site-packages/matplotlib/mpl-data/stylelib \
     /usr/local/lib/python3.13/site-packages/tensorboard \
-    /usr/local/lib/python3.13/site-packages/tensorboard_plugin_wit
+    /usr/local/lib/python3.13/site-packages/tensorboard_plugin_wit \
+    /usr/local/lib/python3.13/site-packages/pytest \
+    /usr/local/lib/python3.13/site-packages/_pytest \
+    /usr/local/lib/python3.13/site-packages/pytest_django \
+    /usr/local/lib/python3.13/site-packages/pluggy \
+    /usr/local/lib/python3.13/site-packages/iniconfig \
+    /usr/local/lib/python3.13/site-packages/mock \
+    /usr/local/lib/python3.13/site-packages/factory \
+    /usr/local/lib/python3.13/site-packages/faker \
+    /usr/local/lib/python3.13/site-packages/coverage
 
 
 FROM ${ARCH}python:3.13-slim-trixie
@@ -155,8 +164,6 @@ WORKDIR /srv
 # Copy over the code
 COPY photonix /srv/photonix
 COPY manage.py /srv/manage.py
-COPY test.py /srv/test.py
-COPY tests /srv/tests
 COPY ui/public /srv/ui/public
 
 # Copy system config and init scripts
