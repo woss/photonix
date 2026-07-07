@@ -743,6 +743,13 @@ class TestGraphQLOnboarding(unittest.TestCase):
 
     def test_onboarding_steps(self):
         """Check all the steps of onboarding(user sign up) process."""
+        from django.contrib.auth.models import AnonymousUser
+        from .conftest import ApiClient
+
+        # First-run onboarding happens before any user or JWT exists, so drive
+        # it with an anonymous client. createUser establishes a session cookie
+        # that the client carries into the remaining steps.
+        self.api_client = ApiClient(user=AnonymousUser())
         environment_query = """
             query{
                 environment {
@@ -777,7 +784,9 @@ class TestGraphQLOnboarding(unittest.TestCase):
         assert User.objects.all().count() == 1
         assert User.objects.first().has_set_personal_info
         self.assertFalse(User.objects.first().has_created_library)
-        self.assertFalse(response.wsgi_request.user.username)
+        # createUser now starts a session so the remaining onboarding steps
+        # run as the authenticated new user.
+        self.assertEqual(response.wsgi_request.user.username, 'demo')
         mutation = """
             mutation ($name: String!,$backendType: String!,$path: String!,$userId: ID!) 
                 {

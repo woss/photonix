@@ -241,6 +241,108 @@ def test_cannot_change_another_users_photo_file(victim, attacker_client):
     assert victim['photo_file'].user_rotation == 0
 
 
+def test_anonymous_cannot_run_onboarding_mutations_for_existing_user(victim):
+    """Onboarding mutations must not act on a client-supplied user id.
+
+    Before being locked down, createLibrary/PhotoImporting/imageAnalysis
+    trusted the userId/libraryId arguments from unauthenticated callers,
+    allowing an anonymous attacker to attach libraries and import paths to
+    any account and to be logged in as any not-yet-onboarded user.
+    """
+    from django.contrib.auth.models import AnonymousUser
+
+    from photonix.photos.models import Library, LibraryPath
+
+    client = ApiClient(user=AnonymousUser())
+    victim_path = LibraryPath.objects.create(
+        library=victim['library'], type='St', backend_type='Lo',
+        path='/data/photos')
+
+    mutation = """
+        mutation ($name: String!, $backendType: String!, $path: String!, $userId: ID!) {
+            createLibrary(input: {name: $name, backendType: $backendType, path: $path, userId: $userId}) {
+                ok
+            }
+        }
+    """
+    response = client.post_graphql(mutation, {
+        'name': 'evil', 'backendType': 'Lo', 'path': '/data/photos',
+        'userId': str(victim['user'].id)})
+    get_graphql_errors(response)
+    assert Library.objects.filter(users__user=victim['user']).count() == 1
+
+    mutation = """
+        mutation ($watchForChanges: Boolean!, $addAnotherPath: Boolean!, $importPath: String!,
+                  $deleteAfterImport: Boolean!, $userId: ID!, $libraryId: ID!, $libraryPathId: ID!) {
+            PhotoImporting(input: {watchForChanges: $watchForChanges, addAnotherPath: $addAnotherPath,
+                                   importPath: $importPath, deleteAfterImport: $deleteAfterImport,
+                                   userId: $userId, libraryId: $libraryId, libraryPathId: $libraryPathId}) {
+                ok
+            }
+        }
+    """
+    response = client.post_graphql(mutation, {
+        'watchForChanges': True, 'addAnotherPath': True,
+        'importPath': '/data/photos', 'deleteAfterImport': True,
+        'userId': str(victim['user'].id),
+        'libraryId': str(victim['library'].id),
+        'libraryPathId': str(victim_path.id)})
+    get_graphql_errors(response)
+    victim_path.refresh_from_db()
+    assert victim_path.watch_for_changes is False
+    assert victim['library'].paths.filter(type='Im').count() == 0
+
+    victim['user'].has_configured_image_analysis = False
+    victim['user'].save()
+    mutation = """
+        mutation ($userId: ID!, $libraryId: ID!) {
+            imageAnalysis(input: {classificationColorEnabled: false,
+                                  classificationStyleEnabled: false,
+                                  classificationObjectEnabled: false,
+                                  classificationLocationEnabled: false,
+                                  classificationFaceEnabled: false,
+                                  userId: $userId, libraryId: $libraryId}) {
+                ok
+            }
+        }
+    """
+    response = client.post_graphql(mutation, {
+        'userId': str(victim['user'].id), 'libraryId': str(victim['library'].id)})
+    get_graphql_errors(response)
+    assert not response.wsgi_request.user.is_authenticated
+    victim['user'].refresh_from_db()
+    victim['library'].refresh_from_db()
+    assert victim['user'].has_configured_image_analysis is False
+    assert victim['library'].classification_color_enabled is True
+
+
+def test_cannot_hijack_another_users_onboarding(victim, attacker_client):
+    """An authenticated user must not complete image analysis onboarding (and
+    thereby be logged in) as a different, not-yet-onboarded user."""
+    victim['user'].has_configured_image_analysis = False
+    victim['user'].save()
+
+    mutation = """
+        mutation ($userId: ID!, $libraryId: ID!) {
+            imageAnalysis(input: {classificationColorEnabled: true,
+                                  classificationStyleEnabled: true,
+                                  classificationObjectEnabled: true,
+                                  classificationLocationEnabled: true,
+                                  classificationFaceEnabled: true,
+                                  userId: $userId, libraryId: $libraryId}) {
+                ok
+            }
+        }
+    """
+    response = attacker_client.post_graphql(mutation, {
+        'userId': str(victim['user'].id),
+        'libraryId': str(attacker_client.library.id)})
+    get_graphql_errors(response)
+    assert response.wsgi_request.user != victim['user']
+    victim['user'].refresh_from_db()
+    assert victim['user'].has_configured_image_analysis is False
+
+
 def test_anonymous_user_cannot_read_or_mutate(victim):
     from django.contrib.auth.models import AnonymousUser
 

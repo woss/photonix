@@ -1,6 +1,7 @@
 import os
 
-from django.contrib.auth import get_user_model, authenticate, update_session_auth_hash
+from django.conf import settings
+from django.contrib.auth import get_user_model, authenticate, load_backend, login, update_session_auth_hash
 import graphene
 from graphene_django.types import DjangoObjectType
 from graphql import GraphQLError
@@ -41,6 +42,16 @@ class CreateUser(graphene.Mutation):
             user.set_password(password1)
             user.has_set_personal_info = True
             user.save()
+            # Start a session for the new account so the remaining first-run
+            # onboarding steps (createLibrary, PhotoImporting, imageAnalysis)
+            # can require an authenticated user matching the supplied userId,
+            # rather than trusting a client-supplied id from any caller.
+            for backend in settings.AUTHENTICATION_BACKENDS:
+                if user == load_backend(backend).get_user(user.pk):
+                    user.backend = backend
+                    break
+            if hasattr(user, 'backend'):
+                login(info.context, user)
         return CreateUser(
             has_set_personal_info=user.has_set_personal_info,
             ok=True, user_id=user.id)

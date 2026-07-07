@@ -778,6 +778,19 @@ class CreateLibraryInput(graphene.InputObjectType):
     user_id = graphene.ID(required=True)
 
 
+def get_onboarding_user(info, user_id):
+    # The onboarding mutations historically trusted the userId argument from
+    # unauthenticated callers, letting anyone act on (and ultimately be logged
+    # in as) an arbitrary account. CreateUser now starts a session, so require
+    # the caller to be that same user.
+    user = info.context.user
+    if not user.is_authenticated:
+        raise GraphQLError('Not logged in')
+    if str(user.pk) != str(user_id):
+        raise GraphQLError('Cannot perform onboarding for another user')
+    return user
+
+
 class CreateLibrary(graphene.Mutation):
     """Docstring for CreateLibrary."""
 
@@ -795,6 +808,7 @@ class CreateLibrary(graphene.Mutation):
     @staticmethod
     def mutate(self, info, input=None):
         """Mutate method."""
+        user = get_onboarding_user(info, input.user_id)
         library_obj = Library.objects.create(name=input.name)
         if input.backend_type == 'Lo':
             library_path_obj = LibraryPath.objects.create(
@@ -806,7 +820,6 @@ class CreateLibrary(graphene.Mutation):
                 type="St", path=input.path, url=input.get('url'),
                 s3_access_key_id=input.s3_access_key_id,
                 s3_secret_key=input.s3_secret_key)
-        user = User.objects.get(pk=input.user_id)
         user.has_created_library = True
         user.save()
         LibraryUser.objects.create(
@@ -845,15 +858,23 @@ class PhotoImporting(graphene.Mutation):
     @staticmethod
     def mutate(self, info, input=None):
         """Mutate method."""
-        library_path_obj = LibraryPath.objects.get(pk=input.library_path_id)
+        user = get_onboarding_user(info, input.user_id)
+        try:
+            library_path_obj = LibraryPath.objects.get(
+                pk=input.library_path_id, library__users__user=user)
+        except LibraryPath.DoesNotExist:
+            raise GraphQLError('Library path not found')
         library_path_obj.watch_for_changes = input.watch_for_changes
         library_path_obj.save()
         if input.add_another_path:
+            try:
+                library = Library.objects.get(pk=input.library_id, users__user=user)
+            except Library.DoesNotExist:
+                raise GraphQLError('Library not found')
             LibraryPath.objects.create(
-                library=Library.objects.get(pk=input.library_id),
+                library=library,
                 type="Im", backend_type="Lo",
                 path=input.import_path, delete_after_import=input.delete_after_import)
-        user = User.objects.get(pk=input.user_id)
         user.has_configured_importing = True
         user.save()
         return PhotoImporting(
@@ -876,14 +897,17 @@ class ImageAnalysis(graphene.Mutation):
     @staticmethod
     def mutate(self, info, input=None):
         """Mutate method."""
-        library_obj = Library.objects.get(pk=input.library_id)
+        user = get_onboarding_user(info, input.user_id)
+        try:
+            library_obj = Library.objects.get(pk=input.library_id, users__user=user)
+        except Library.DoesNotExist:
+            raise GraphQLError('Library not found')
         library_obj.classification_color_enabled = input.classification_color_enabled
         library_obj.classification_location_enabled = input.classification_location_enabled
         library_obj.classification_style_enabled = input.classification_style_enabled
         library_obj.classification_object_enabled = input.classification_object_enabled
         library_obj.classification_face_enabled = input.classification_face_enabled
         library_obj.save()
-        user = User.objects.get(pk=input.user_id)
         # Only auto-login as part of genuine first-run onboarding, i.e. when this
         # user is completing image-analysis configuration for the very first time.
         # Without this guard the mutation would grant a session for ANY user_id
