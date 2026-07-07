@@ -12,6 +12,7 @@ import { useCurrentPhotoData } from './hooks/useCurrentPhotoData'
 import { useOptimalResolution } from './hooks/useOptimalResolution'
 import { usePhotoListStore } from '../../lib/photos/photo-list-store'
 import { UPDATE_PHOTO_RATING } from '../../lib/photos/graphql'
+import { addToast } from '../../lib/ui/store'
 import type { PhotoDetail } from '../../lib/photos/detail-types'
 
 interface PhotoDetailViewProps {
@@ -108,7 +109,10 @@ export function PhotoDetailView({ photo }: PhotoDetailViewProps) {
       setLocalRating(newRating)
       updateRating({
         variables: { photoId: currentPhoto.id, starRating: newRating },
-      }).catch(() => setLocalRating(currentPhoto.starRating))
+      }).catch(() => {
+        setLocalRating(currentPhoto.starRating)
+        addToast("Couldn't save rating")
+      })
     },
     [currentPhoto.id, currentPhoto.starRating, updateRating]
   )

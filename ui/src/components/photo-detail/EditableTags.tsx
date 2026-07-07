@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useMutation } from '@apollo/client/react'
 import { X } from 'lucide-react'
 import { CREATE_GENERIC_TAG, REMOVE_GENERIC_TAG } from '../../lib/photos/detail-graphql'
+import { addToast } from '../../lib/ui/store'
 import type { GenericTag } from '../../lib/photos/detail-types'
 
 interface EditableTagsProps {
@@ -49,10 +50,12 @@ export function EditableTags({
         if (result.data?.createGenericTag.ok) {
           setNewTag('')
           onTagsUpdated()
+        } else {
+          addToast(`Couldn't add tag "${newTag.trim()}"`)
         }
       })
       .catch(() => {
-        // Handle error silently
+        addToast(`Couldn't add tag "${newTag.trim()}"`)
       })
   }
 
@@ -78,10 +81,12 @@ export function EditableTags({
       .then((result) => {
         if (result.data?.removeGenericTag.ok) {
           onTagsUpdated()
+        } else {
+          addToast("Couldn't remove tag")
         }
       })
       .catch(() => {
-        // Handle error silently
+        addToast("Couldn't remove tag")
       })
   }
 

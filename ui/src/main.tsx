@@ -5,6 +5,8 @@ import { RouterProvider } from '@tanstack/react-router'
 
 import { apolloClient } from './lib/apollo-client'
 import { AuthProvider, useAuth } from './lib/auth/auth-context'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { ToastStack } from './components/ui/Toast'
 import { createAppRouter } from './router'
 
 import './index.css'
@@ -17,10 +19,13 @@ function AppWithRouter() {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ApolloProvider client={apolloClient}>
-      <AuthProvider>
-        <AppWithRouter />
-      </AuthProvider>
-    </ApolloProvider>
+    <ErrorBoundary>
+      <ApolloProvider client={apolloClient}>
+        <AuthProvider>
+          <AppWithRouter />
+          <ToastStack />
+        </AuthProvider>
+      </ApolloProvider>
+    </ErrorBoundary>
   </StrictMode>
 )

@@ -12,6 +12,7 @@ import {
   UPDATE_OBJECT_ENABLED,
   UPDATE_WATCH_PHOTOS,
 } from '../../lib/settings/graphql'
+import { addToast } from '../../lib/ui/store'
 
 interface SettingsModalProps {
   onClose: () => void
@@ -103,6 +104,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
       .catch(() => {
         // Revert on failure.
         setOverrides((prev) => ({ ...prev, [key]: !newValue }))
+        addToast("Couldn't save setting")
       })
   }
 

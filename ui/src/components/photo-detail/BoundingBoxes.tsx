@@ -6,6 +6,7 @@ import {
   BLOCK_FACE_TAG,
   VERIFY_FACE_TAG,
 } from '../../lib/photos/detail-graphql'
+import { addToast } from '../../lib/ui/store'
 import type { PersonTag, ObjectTag } from '../../lib/photos/detail-types'
 
 // Shared view state for synchronizing with PhotoViewer
@@ -327,9 +328,12 @@ export function BoundingBoxes({
         })
         if (result.data?.editFaceTag?.ok) {
           onRefetch?.()
+        } else {
+          addToast("Couldn't rename face tag")
         }
       } catch (e) {
         console.error('Failed to edit face tag:', e)
+        addToast("Couldn't rename face tag")
       }
     },
     [editFaceTag, onRefetch]
@@ -343,9 +347,12 @@ export function BoundingBoxes({
         })
         if (result.data?.blockFaceTag?.ok) {
           onRefetch?.()
+        } else {
+          addToast("Couldn't reject face tag")
         }
       } catch (e) {
         console.error('Failed to block face tag:', e)
+        addToast("Couldn't reject face tag")
       }
     },
     [blockFaceTag, onRefetch]
@@ -359,9 +366,12 @@ export function BoundingBoxes({
         })
         if (result.data?.verifyPhoto?.ok) {
           onRefetch?.()
+        } else {
+          addToast("Couldn't verify face tag")
         }
       } catch (e) {
         console.error('Failed to verify face tag:', e)
+        addToast("Couldn't verify face tag")
       }
     },
     [verifyFaceTag, onRefetch]

@@ -3,6 +3,7 @@ import { useMutation } from '@apollo/client/react'
 import { Check } from 'lucide-react'
 import { StarRating } from './StarRating'
 import { UPDATE_PHOTO_RATING } from '../../lib/photos/graphql'
+import { addToast } from '../../lib/ui/store'
 import type { ThumbnailPhoto } from '../../lib/photos/types'
 
 interface ThumbnailProps {
@@ -54,7 +55,10 @@ export const Thumbnail = memo(function Thumbnail({
     setLocalRating(newRating)
     updateRating({
       variables: { photoId: photo.id, starRating: newRating },
-    }).catch(() => setLocalRating(photo.starRating))
+    }).catch(() => {
+      setLocalRating(photo.starRating)
+      addToast("Couldn't save rating")
+    })
   }
 
   const canHover =
