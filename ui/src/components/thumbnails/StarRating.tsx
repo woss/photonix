@@ -47,6 +47,16 @@ export function StarRating({
     [rating, onRatingChange]
   )
 
+  // The rating action fires on mousedown; the browser still emits a click
+  // afterwards which would bubble to the thumbnail and open the photo, so
+  // swallow it here
+  const swallowClick = useCallback((e: React.MouseEvent) => {
+    if (onRatingChange) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+  }, [onRatingChange])
+
   // Always render so hover area exists, but control visibility via opacity
   return (
     <div
@@ -66,6 +76,7 @@ export function StarRating({
           }`}
           onMouseEnter={() => handleMouseEnter(i)}
           onMouseDown={(e) => handleClick(i, e)}
+          onClick={swallowClick}
         />
       ))}
     </div>
