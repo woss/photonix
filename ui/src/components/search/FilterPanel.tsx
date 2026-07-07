@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@apollo/client/react'
 import { RangeSlider } from './RangeSlider'
+import { ScrollArea } from '../ui'
 import { useLibrariesStore } from '../../lib/libraries'
 import { useSearchStore } from '../../lib/search/store'
 import { GET_FILTER_FACETS } from '../../lib/search/facets-graphql'
@@ -51,6 +52,8 @@ export function FilterPanel() {
     const exposures = [...data.allExposures].sort(
       (a, b) => exposureSeconds(a) - exposureSeconds(b)
     )
+    // Order mirrors master's FiltersContainer: Aperture, Exposure, ISO Speed,
+    // Focal Length, Rating.
     return [
       {
         key: 'aperture',
@@ -60,6 +63,15 @@ export function FilterPanel() {
         values: apertures,
         format: (v) => `f/${v}`,
         emit: 'range',
+      },
+      {
+        key: 'exposure',
+        label: 'Exposure',
+        prefix: 'exposure',
+        group: 'Exposure',
+        values: exposures,
+        format: (v) => `${v}s`,
+        emit: 'list',
       },
       {
         key: 'isoSpeed',
@@ -78,15 +90,6 @@ export function FilterPanel() {
         values: focals,
         format: (v) => `${v}mm`,
         emit: 'range',
-      },
-      {
-        key: 'exposure',
-        label: 'Exposure',
-        prefix: 'exposure',
-        group: 'Exposure',
-        values: exposures,
-        format: (v) => `${v}s`,
-        emit: 'list',
       },
       {
         key: 'rating',
@@ -216,160 +219,157 @@ export function FilterPanel() {
     'mb-2 shrink-0 text-xs font-semibold uppercase tracking-wide text-neutral-400'
   const bodyClass = 'flex flex-wrap content-start gap-2 overflow-y-auto pr-1'
 
+  // A tag-chip facet column (Objects / Styles).
+  const tagColumn = (
+    testid: string,
+    label: string,
+    tags: TagItem[],
+    group: FilterType
+  ) =>
+    tags.length > 0 && (
+      <div className={colClass} data-testid={testid}>
+        <div className={headClass}>{label}</div>
+        <div className={bodyClass}>
+          {tags.map((tag) => (
+            <button
+              key={tag.id}
+              className={chip(isActive(`tag:${tag.id}`))}
+              onClick={() => toggleTag(tag, group)}
+            >
+              {tag.name}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+
   return (
     <div
-      className="border-t border-neutral-700 bg-neutral-800"
+      className="border-t border-neutral-700 bg-neutral-800 py-4"
       data-testid="filter-panel"
     >
-      <div className="flex h-52 gap-6 overflow-x-auto p-4">
-        {/* Range sliders — one column each */}
-        {numericFacets
-          .filter((f) => f.values.length > 1)
-          .map((facet) => {
-            const [min, max] = sliderRange(facet)
-            return (
-              <div key={facet.key} className={colClass} data-testid={`facet-${facet.key}`}>
-                <div className={headClass}>{facet.label}</div>
-                <RangeSlider
-                  count={facet.values.length}
-                  minIndex={min}
-                  maxIndex={max}
-                  onChange={(a, b) => onSliderChange(facet, a, b)}
-                  formatValue={(i) => facet.format(facet.values[i])}
-                />
-              </div>
-            )
-          })}
+      {/* Order mirrors master's FiltersContainer. */}
+      <ScrollArea>
+        <div className="flex h-52 gap-6 px-4">
+          {/* Objects */}
+          {tagColumn('facet-objects', 'Objects', data.allObjectTags, 'Objects')}
 
-        {/* Flash */}
-        <div className={colClass} data-testid="facet-flash">
-          <div className={headClass}>Flash</div>
-          <div className={bodyClass}>
-            <button className={chip(flashOn)} onClick={() => setFlash(true)} data-testid="flash-on">
-              On
-            </button>
-            <button className={chip(flashOff)} onClick={() => setFlash(false)} data-testid="flash-off">
-              Off
-            </button>
-          </div>
-        </div>
-
-        {/* Mode facets */}
-        {modeFacets
-          .filter((m) => m.values.length > 0)
-          .map((mode) => (
-            <div key={mode.prefix} className={colClass} data-testid={`facet-${mode.prefix}`}>
-              <div className={headClass}>{mode.label}</div>
-              <div className={bodyClass}>
-                {mode.values.map((v) => (
-                  <button
-                    key={v}
-                    className={chip(isActive(`${mode.prefix}:${v}`))}
-                    onClick={() => toggleMode(mode.prefix, v, mode.group)}
-                  >
-                    {v}
-                  </button>
+          {/* Locations (hierarchical) */}
+          {locationTree.length > 0 && (
+            <div className={`${colClass} w-56`} data-testid="facet-locations">
+              <div className={headClass}>Locations</div>
+              <ul className="space-y-1 overflow-y-auto pr-1">
+                {locationTree.map(({ tag, children }) => (
+                  <li key={tag.id}>
+                    <button
+                      className={`text-sm ${isActive(`tag:${tag.id}`) ? 'text-teal-400' : 'text-neutral-200 hover:text-white'}`}
+                      onClick={() => toggleTag(tag, 'Locations')}
+                    >
+                      {tag.name}
+                    </button>
+                    {children.length > 0 && (
+                      <ul className="ml-4 space-y-1 border-l border-neutral-700 pl-3">
+                        {children.map((child) => (
+                          <li key={child.id}>
+                            <button
+                              className={`text-sm ${isActive(`tag:${child.id}`) ? 'text-teal-400' : 'text-neutral-300 hover:text-white'}`}
+                              onClick={() => toggleTag(child, 'Locations')}
+                            >
+                              {child.name}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
                 ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Colors */}
+          {data.allColorTags.length > 0 && (
+            <div className={colClass} data-testid="facet-colors">
+              <div className={headClass}>Colors</div>
+              <div className={bodyClass}>
+                {data.allColorTags.map((tag) => {
+                  const active = isActive(`tag:${tag.id}`)
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => toggleTag(tag, 'Colors')}
+                      className={`flex h-fit items-center gap-1.5 rounded-full py-1 pl-1.5 pr-3 text-sm ${
+                        active ? 'bg-teal-600 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-neutral-600'
+                      }`}
+                    >
+                      <span
+                        className="h-4 w-4 rounded-full border border-white/40"
+                        style={{ backgroundColor: tag.name.toLowerCase() }}
+                      />
+                      {tag.name}
+                    </button>
+                  )
+                })}
               </div>
             </div>
-          ))}
+          )}
 
-        {/* Colors */}
-        {data.allColorTags.length > 0 && (
-          <div className={colClass} data-testid="facet-colors">
-            <div className={headClass}>Colors</div>
+          {/* Styles */}
+          {tagColumn('facet-styles', 'Styles', data.allStyleTags, 'Styles')}
+
+          {/* Range sliders — Aperture, Exposure, ISO, Focal Length, Rating */}
+          {numericFacets
+            .filter((f) => f.values.length > 1)
+            .map((facet) => {
+              const [min, max] = sliderRange(facet)
+              return (
+                <div key={facet.key} className={colClass} data-testid={`facet-${facet.key}`}>
+                  <div className={headClass}>{facet.label}</div>
+                  <RangeSlider
+                    count={facet.values.length}
+                    minIndex={min}
+                    maxIndex={max}
+                    onChange={(a, b) => onSliderChange(facet, a, b)}
+                    formatValue={(i) => facet.format(facet.values[i])}
+                  />
+                </div>
+              )
+            })}
+
+          {/* Flash */}
+          <div className={colClass} data-testid="facet-flash">
+            <div className={headClass}>Flash</div>
             <div className={bodyClass}>
-              {data.allColorTags.map((tag) => {
-                const active = isActive(`tag:${tag.id}`)
-                return (
-                  <button
-                    key={tag.id}
-                    onClick={() => toggleTag(tag, 'Colors')}
-                    className={`flex h-fit items-center gap-1.5 rounded-full py-1 pl-1.5 pr-3 text-sm ${
-                      active ? 'bg-teal-600 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-neutral-600'
-                    }`}
-                  >
-                    <span
-                      className="h-4 w-4 rounded-full border border-white/40"
-                      style={{ backgroundColor: tag.name.toLowerCase() }}
-                    />
-                    {tag.name}
-                  </button>
-                )
-              })}
+              <button className={chip(flashOn)} onClick={() => setFlash(true)} data-testid="flash-on">
+                On
+              </button>
+              <button className={chip(flashOff)} onClick={() => setFlash(false)} data-testid="flash-off">
+                Off
+              </button>
             </div>
           </div>
-        )}
 
-        {/* Objects */}
-        {data.allObjectTags.length > 0 && (
-          <div className={colClass} data-testid="facet-objects">
-            <div className={headClass}>Objects</div>
-            <div className={bodyClass}>
-              {data.allObjectTags.map((tag) => (
-                <button
-                  key={tag.id}
-                  className={chip(isActive(`tag:${tag.id}`))}
-                  onClick={() => toggleTag(tag, 'Objects')}
-                >
-                  {tag.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Styles */}
-        {data.allStyleTags.length > 0 && (
-          <div className={colClass} data-testid="facet-styles">
-            <div className={headClass}>Styles</div>
-            <div className={bodyClass}>
-              {data.allStyleTags.map((tag) => (
-                <button
-                  key={tag.id}
-                  className={chip(isActive(`tag:${tag.id}`))}
-                  onClick={() => toggleTag(tag, 'Styles')}
-                >
-                  {tag.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Locations (hierarchical) */}
-        {locationTree.length > 0 && (
-          <div className={`${colClass} w-56`} data-testid="facet-locations">
-            <div className={headClass}>Locations</div>
-            <ul className="space-y-1 overflow-y-auto pr-1">
-              {locationTree.map(({ tag, children }) => (
-                <li key={tag.id}>
-                  <button
-                    className={`text-sm ${isActive(`tag:${tag.id}`) ? 'text-teal-400' : 'text-neutral-200 hover:text-white'}`}
-                    onClick={() => toggleTag(tag, 'Locations')}
-                  >
-                    {tag.name}
-                  </button>
-                  {children.length > 0 && (
-                    <ul className="ml-4 space-y-1 border-l border-neutral-700 pl-3">
-                      {children.map((child) => (
-                        <li key={child.id}>
-                          <button
-                            className={`text-sm ${isActive(`tag:${child.id}`) ? 'text-teal-400' : 'text-neutral-300 hover:text-white'}`}
-                            onClick={() => toggleTag(child, 'Locations')}
-                          >
-                            {child.name}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
+          {/* Metering / Drive / Shooting modes */}
+          {modeFacets
+            .filter((m) => m.values.length > 0)
+            .map((mode) => (
+              <div key={mode.prefix} className={colClass} data-testid={`facet-${mode.prefix}`}>
+                <div className={headClass}>{mode.label}</div>
+                <div className={bodyClass}>
+                  {mode.values.map((v) => (
+                    <button
+                      key={v}
+                      className={chip(isActive(`${mode.prefix}:${v}`))}
+                      onClick={() => toggleMode(mode.prefix, v, mode.group)}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      </ScrollArea>
     </div>
   )
 }
