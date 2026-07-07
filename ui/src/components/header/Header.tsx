@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import Logo from '../../assets/logo.svg'
 import { useUIStore } from '../../lib/ui/store'
+import { Notifications } from '../notifications/Notifications'
 
 interface UserProfile {
   username: string
@@ -83,6 +84,9 @@ export function Header({
 
       {/* Navigation spacer */}
       <div className="flex-grow" />
+
+      {/* Background-task progress bell */}
+      <Notifications />
 
       {/* User menu */}
       <div ref={menuRef} className="relative">
