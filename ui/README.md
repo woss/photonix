@@ -1,73 +1,69 @@
-# React + TypeScript + Vite
+# Photonix UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React frontend for [Photonix](https://photonix.org), built with Vite, React 19,
+TypeScript, Tailwind CSS 4, TanStack Router, Apollo Client and Zustand.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+There are two ways to run the UI during development. Both need the Docker dev
+stack running first (`make start` from the repo root), which provides the
+Django/GraphQL backend, nginx, Postgres and Redis.
 
-## React Compiler
+### 1. Inside the container (default)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+`make start` runs a Vite dev server inside the `photonix` container
+(supervisord program `vite`) and serves everything through nginx at
+**http://localhost:8888**. Source files are bind-mounted, so edits on the host
+hot-reload in the browser. No host-side setup is needed.
 
-## Expanding the ESLint configuration
+### 2. On the host
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+For faster tooling (editor integration, quicker restarts) you can run Vite on
+the host against the container backend:
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```sh
+cd ui
+npm install
+npm run dev            # serves on http://localhost:3000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`vite.config.ts` proxies `/graphql`, `/thumbnailer`, `/thumbnails`,
+`/download` and `/photos` to the container nginx (default
+`http://localhost:8888`, override with the `PHOTONIX_BACKEND` env var). The
+proxy also rewrites the `Origin`/`Referer` headers so Django's CSRF origin
+check passes when the app is served from a different port.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Scripts
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Command                | What it does                                     |
+| ---------------------- | ------------------------------------------------ |
+| `npm run dev`          | Vite dev server on :3000                         |
+| `npm run build`        | Typecheck (`tsc -b`) + production build          |
+| `npm run lint`         | ESLint over the whole package                    |
+| `npm run test:e2e`     | Playwright end-to-end suite                      |
+| `npm run test:e2e:ui`  | Playwright suite in interactive UI mode          |
+
+Equivalent repo-root Makefile targets: `make lint-ui`, `make build-ui`,
+`make e2e` (alias `make test-ui`).
+
+## End-to-end tests
+
+The Playwright specs in `e2e/` run against the real dev stack at
+`http://localhost:8888` — start it with `make start` before running them.
+
+- Specs seed and clean up their own users/photos by piping Python into
+  `manage.py shell` in the container (see `e2e/test-utils.ts`).
+- Image fixtures (`/data/photos/test_<colour>.jpg`, `checkerboard.jpg`) are
+  generated inside the container by `e2e/global-setup.ts` on the first run —
+  no manual setup required.
+- Tests share one database and run serially (`workers: 1`).
+
+```sh
+cd ui
+npx playwright install chromium   # first time only
+npm run test:e2e
 ```
+
+In CI the suite runs in the `test-e2e` job of
+`.github/workflows/docker-build.yml`, which boots the compose stack with
+`docker/docker-compose.ci.yml` overrides (no demo-photo downloads).
