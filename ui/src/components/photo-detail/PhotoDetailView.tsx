@@ -49,7 +49,10 @@ export function PhotoDetailView({ photo }: PhotoDetailViewProps) {
     setLocalRating(currentPhoto.starRating)
   }, [currentPhoto.id, currentPhoto.starRating])
 
-  const [updateRating] = useMutation(UPDATE_PHOTO_RATING)
+  // Refetch any mounted filter facets so the Rating range reflects the change.
+  const [updateRating] = useMutation(UPDATE_PHOTO_RATING, {
+    refetchQueries: ['FilterFacets'],
+  })
 
   const { hasPrev, hasNext, rotationsByPhotoId, updateRotation } = usePhotoListStore()
 

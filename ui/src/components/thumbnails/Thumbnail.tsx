@@ -32,7 +32,10 @@ export const Thumbnail = memo(function Thumbnail({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressed = useRef(false)
 
-  const [updateRating] = useMutation(UPDATE_PHOTO_RATING)
+  // Refetch any mounted filter facets so the Rating range reflects the change.
+  const [updateRating] = useMutation(UPDATE_PHOTO_RATING, {
+    refetchQueries: ['FilterFacets'],
+  })
 
   useEffect(() => {
     setLocalRating(photo.starRating)
