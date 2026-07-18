@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@apollo/client/react'
 import { MapView, type MapMarkerPhoto } from '../../../components/map/MapView'
+import { SearchBar } from '../../../components/search'
 import { GET_MAP_PHOTOS } from '../../../lib/map/graphql'
 import { useLibrariesStore } from '../../../lib/libraries'
 import { usePhotoFilters } from '../../../lib/search'
@@ -31,22 +32,24 @@ function MapPage() {
     [data]
   )
 
-  if (!activeLibraryId) {
-    return (
-      <main className="flex-grow overflow-hidden p-10 text-neutral-400">
-        Select a library to view the map.
-      </main>
-    )
-  }
-
   return (
-    <main className="relative flex-grow overflow-hidden" data-testid="map-page">
-      <MapView
-        photos={photos}
-        onMarkerClick={(id) =>
-          navigate({ to: '/photo/$id', params: { id } })
-        }
-      />
-    </main>
+    <>
+      <SearchBar />
+      {!activeLibraryId ? (
+        <main className="flex-grow overflow-hidden p-10 text-neutral-400">
+          Select a library to view the map.
+        </main>
+      ) : (
+        <main
+          className="relative flex-grow overflow-hidden"
+          data-testid="map-page"
+        >
+          <MapView
+            photos={photos}
+            onMarkerClick={(id) => navigate({ to: '/photo/$id', params: { id } })}
+          />
+        </main>
+      )}
+    </>
   )
 }
