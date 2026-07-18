@@ -146,7 +146,10 @@ test.describe.serial('Library Switching', () => {
     // Click on the second test library (Beta)
     await page.getByTestId(`library-item-${testLibraryIds[1]}`).click()
 
-    // Menu should close, reopen it
+    // Menu should close, reopen it (wait for the Radix menu to fully close
+    // first — an instant re-click races the close transition and toggles the
+    // menu shut again)
+    await expect(page.locator('[role="menu"]')).toBeHidden()
     await page.getByTestId('header-menu-button').click()
 
     // Beta library should now have the active indicator
@@ -218,7 +221,9 @@ test.describe.serial('Library Switching', () => {
       // Click on library
       await page.getByTestId(`library-item-${testLibraryIds[i]}`).click()
 
-      // Reopen menu to verify
+      // Reopen menu to verify (wait for the Radix menu to fully close first —
+      // an instant re-click races the close transition and toggles it shut)
+      await expect(page.locator('[role="menu"]')).toBeHidden()
       await page.getByTestId('header-menu-button').click()
 
       // Check this library has the active indicator
@@ -237,6 +242,7 @@ test.describe.serial('Library Switching', () => {
 
       // Close menu before next iteration
       await page.keyboard.press('Escape')
+      await expect(page.locator('[role="menu"]')).toBeHidden()
     }
   })
 })
