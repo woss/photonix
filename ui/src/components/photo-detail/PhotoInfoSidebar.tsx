@@ -10,6 +10,7 @@ import { MapView } from '../map/MapView'
 import { ColorTags } from './ColorTags'
 import { getPhotoThumbnailUrl, type ThumbnailResolution } from '../../lib/photos/image-cache-store'
 import { CHANGE_PREFERRED_PHOTO_FILE } from '../../lib/photos/detail-graphql'
+import { Select } from '../ui'
 import { addToast } from '../../lib/ui/store'
 import type { PhotoDetail } from '../../lib/photos/detail-types'
 
@@ -369,18 +370,15 @@ export function PhotoInfoSidebar({
         {/* Multiple file versions */}
         {photo.photoFile.length > 1 && (
           <Section title="Versions" index={sectionIndex++}>
-            <select
-              className="w-full bg-neutral-700 text-white rounded px-2 py-1 text-sm"
+            <Select
               value={photo.baseFileId ?? undefined}
-              onChange={(e) => handleVersionChange(e.target.value)}
+              onValueChange={handleVersionChange}
               data-testid="version-select"
-            >
-              {photo.photoFile.map((file) => (
-                <option key={file.id} value={file.id}>
-                  {file.path.split('/').pop()}
-                </option>
-              ))}
-            </select>
+              options={photo.photoFile.map((file) => ({
+                value: file.id,
+                label: file.path.split('/').pop() ?? file.id,
+              }))}
+            />
           </Section>
         )}
       </div>

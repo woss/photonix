@@ -6,6 +6,7 @@ import type {
   RevokeTokenResponse,
   DeleteAuthCookiesResponse,
   EnvironmentResponse,
+  ProfileResponse,
 } from './types'
 
 export const TOKEN_AUTH: TypedDocumentNode<
@@ -68,6 +69,20 @@ export const ENVIRONMENT: TypedDocumentNode<
     environment {
       demo
       sampleData
+    }
+  }
+`
+
+// The logged-in user's profile (username + email), used to populate the
+// header account menu.
+export const GET_PROFILE: TypedDocumentNode<
+  ProfileResponse,
+  Record<string, never>
+> = gql`
+  query Profile {
+    profile {
+      username
+      email
     }
   }
 `

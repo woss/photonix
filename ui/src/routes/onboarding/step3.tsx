@@ -157,7 +157,7 @@ function Step3CreateLibrary() {
               label="Storage Type"
               name={field.name}
               value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value as StorageBackend)}
+              onValueChange={(value) => field.handleChange(value as StorageBackend)}
               onBlur={field.handleBlur}
               error={getErrorMessage(field.state.meta.errors)}
               options={STORAGE_OPTIONS}

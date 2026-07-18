@@ -59,3 +59,10 @@ export interface Environment {
 export interface EnvironmentResponse {
   environment: Environment
 }
+
+export interface ProfileResponse {
+  profile: {
+    username: string
+    email: string | null
+  } | null
+}

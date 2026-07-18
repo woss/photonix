@@ -3,6 +3,7 @@ import { useQuery } from '@apollo/client/react'
 import { Header } from './header'
 import { Tabs } from './Tabs'
 import { useAuth } from '../lib/auth/auth-context'
+import { GET_PROFILE } from '../lib/auth/graphql'
 import {
   useLibrariesStore,
   GET_ALL_LIBRARIES,
@@ -20,6 +21,7 @@ interface BrowseLayoutProps {
 export function BrowseLayout({ children }: BrowseLayoutProps) {
   const { user } = useAuth()
   const { data: librariesData } = useQuery(GET_ALL_LIBRARIES)
+  const { data: profileData } = useQuery(GET_PROFILE)
   const { libraries, activeLibraryId, setLibraries, setActiveLibrary } =
     useLibrariesStore()
 
@@ -29,7 +31,12 @@ export function BrowseLayout({ children }: BrowseLayoutProps) {
     }
   }, [librariesData, setLibraries])
 
-  const profile = user ? { username: user.username, email: '' } : null
+  const profile = user
+    ? {
+        username: profileData?.profile?.username ?? user.username,
+        email: profileData?.profile?.email ?? '',
+      }
+    : null
 
   const handleLibraryChange = (library: Library) => {
     setActiveLibrary(library.id)

@@ -110,7 +110,7 @@ function LoginPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-neutral-700 text-white px-4 py-3 rounded border border-neutral-600 focus:border-blue-500 focus:outline-none"
+              className="w-full bg-neutral-700 text-white px-4 py-3 rounded border border-neutral-600 focus:border-primary focus:outline-none"
               data-testid="username-input"
               required
             />
@@ -125,7 +125,7 @@ function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-neutral-700 text-white px-4 py-3 rounded border border-neutral-600 focus:border-blue-500 focus:outline-none"
+              className="w-full bg-neutral-700 text-white px-4 py-3 rounded border border-neutral-600 focus:border-primary focus:outline-none"
               data-testid="password-input"
               required
             />
@@ -134,7 +134,7 @@ function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-medium py-3 rounded transition-colors cursor-pointer disabled:cursor-not-allowed"
+            className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-medium py-3 rounded transition-colors cursor-pointer disabled:cursor-not-allowed"
             data-testid="login-button"
           >
             {isSubmitting ? 'Logging in...' : 'Login'}
