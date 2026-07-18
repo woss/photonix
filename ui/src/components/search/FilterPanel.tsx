@@ -1,11 +1,39 @@
 import { useMemo } from 'react'
 import { useQuery } from '@apollo/client/react'
+import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area'
 import { RangeSlider } from './RangeSlider'
 import { useLibrariesStore } from '../../lib/libraries'
 import { useSearchStore } from '../../lib/search/store'
 import { GET_FILTER_FACETS } from '../../lib/search/facets-graphql'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import type { TagItem } from '../../lib/search/graphql'
 import type { FilterType } from '../../lib/search/types'
+
+// Swatch colours mirror master's ColorTags.css so named tags (Amber, Turquoise,
+// Azure, …) render the exact hue rather than relying on CSS colour keywords.
+const COLOR_SWATCH: Record<string, string> = {
+  Red: 'rgb(229, 36, 36)',
+  Orange: 'rgb(245, 133, 0)',
+  Amber: 'rgb(234, 166, 30)',
+  Yellow: 'rgb(240, 240, 39)',
+  Lime: 'rgb(168, 228, 26)',
+  Green: 'rgb(7, 215, 7)',
+  Teal: 'rgb(16, 202, 155)',
+  Turquoise: 'rgb(25, 225, 225)',
+  Aqua: 'rgb(10, 188, 245)',
+  Azure: 'rgb(30, 83, 249)',
+  Blue: 'rgb(0, 0, 255)',
+  Purple: 'rgb(127, 0, 255)',
+  Orchid: 'rgb(190, 0, 255)',
+  Magenta: 'rgb(233, 8, 200)',
+  White: 'rgb(255, 255, 255)',
+  Gray: 'rgb(124, 124, 124)',
+  Black: 'rgb(0, 0, 0)',
+}
+
+const swatchColor = (name: string) =>
+  COLOR_SWATCH[name] ?? name.toLowerCase()
 
 // Parse an exposure string like "1/125" or "8" into seconds for sorting.
 function exposureSeconds(v: string): number {
@@ -247,11 +275,19 @@ export function FilterPanel() {
 
   return (
     <div
-      className="border-t border-neutral-700 bg-neutral-800"
+      className="group/filters border-t border-neutral-700 bg-neutral-800"
       data-testid="filter-panel"
     >
-      {/* Order mirrors master's FiltersContainer. */}
-      <div className="flex h-52 gap-6 overflow-x-auto p-4">
+      {/* Horizontal strip in a Radix ScrollArea: the native bar is replaced by a
+          thin rounded pill that fades in on panel hover (mirrors master). Wheel,
+          drag and touch scrolling still work via the native viewport. */}
+      <ScrollAreaPrimitive.Root
+        type="always"
+        className="relative w-full overflow-hidden"
+      >
+        <ScrollAreaPrimitive.Viewport className="h-52 w-full">
+          {/* Order mirrors master's FiltersContainer. */}
+          <div className="flex h-full gap-6 p-4">
           {/* Objects */}
           {tagColumn('facet-objects', 'Objects', data.allObjectTags, 'Objects')}
 
@@ -288,27 +324,33 @@ export function FilterPanel() {
             </div>
           )}
 
-          {/* Colors */}
+          {/* Colors — compact swatch grid (7 per row, like master's ColorTags),
+              no inner scroll; colour name shown via tooltip on hover. */}
           {data.allColorTags.length > 0 && (
-            <div className={colClass} data-testid="facet-colors">
+            <div className="flex h-full shrink-0 flex-col" data-testid="facet-colors">
               <div className={headClass}>Colors</div>
-              <div className={bodyClass}>
+              <div className="grid grid-cols-7 content-start gap-1.5">
                 {data.allColorTags.map((tag) => {
                   const active = isActive(`tag:${tag.id}`)
                   return (
-                    <button
-                      key={tag.id}
-                      onClick={() => toggleTag(tag, 'Colors')}
-                      className={`flex h-fit items-center gap-1.5 rounded-full py-1 pl-1.5 pr-3 text-sm ${
-                        active ? 'bg-teal-600 text-white' : 'bg-neutral-700 text-neutral-200 hover:bg-neutral-600'
-                      }`}
-                    >
-                      <span
-                        className="h-4 w-4 rounded-full border border-white/40"
-                        style={{ backgroundColor: tag.name.toLowerCase() }}
-                      />
-                      {tag.name}
-                    </button>
+                    <Tooltip key={tag.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => toggleTag(tag, 'Colors')}
+                          aria-label={tag.name}
+                          aria-pressed={active}
+                          data-testid={`color-swatch-${tag.name}`}
+                          className={cn(
+                            'h-[25px] w-[25px] rounded border border-white/30 transition-shadow',
+                            active &&
+                              'ring-2 ring-[#00a8a1] ring-offset-2 ring-offset-neutral-800'
+                          )}
+                          style={{ backgroundColor: swatchColor(tag.name) }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>{tag.name}</TooltipContent>
+                    </Tooltip>
                   )
                 })}
               </div>
@@ -369,7 +411,15 @@ export function FilterPanel() {
                 </div>
               </div>
             ))}
-      </div>
+          </div>
+        </ScrollAreaPrimitive.Viewport>
+        <ScrollAreaPrimitive.Scrollbar
+          orientation="horizontal"
+          className="flex h-2.5 touch-none flex-col p-px opacity-0 transition-opacity duration-200 select-none group-hover/filters:opacity-100"
+        >
+          <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-[#666] transition-colors hover:bg-[#888]" />
+        </ScrollAreaPrimitive.Scrollbar>
+      </ScrollAreaPrimitive.Root>
     </div>
   )
 }

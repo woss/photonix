@@ -165,6 +165,50 @@ h2 {
   font-size: 25px;
 }
 
+/*
+ * Global scrollbar styling. The old UI hid every native scrollbar; the rewrite
+ * keeps content discoverable with thin, dark-native overlay-feel bars instead
+ * of chunky OS defaults. Scoped to the app root (not a blanket html hide) so
+ * every overflow container stays scrollable. Radix ScrollArea viewports draw
+ * their own bar and hide the native one, so they are excluded here.
+ */
+@media (pointer: fine) {
+  #root *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  #root *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  #root *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 9999px;
+  }
+  #root
+    *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+  #root *:not([data-radix-scroll-area-viewport])::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  /* Firefox */
+  #root *:not([data-radix-scroll-area-viewport]) {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  }
+}
+
+/* Touch / coarse pointers: hide scrollbars entirely, content scrolls naturally. */
+@media (pointer: coarse) {
+  #root *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+  #root * {
+    scrollbar-width: none;
+  }
+}
+
 /* Circular photo markers on the map view */
 .leaflet-photo-icon {
   border: 1px solid rgba(255, 255, 255, 0.9);
