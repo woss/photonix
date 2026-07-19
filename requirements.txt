@@ -1,37 +1,37 @@
 tensorflow==2.21.0
-numpy==2.4.4
+numpy==2.5.1
 scipy==1.17.1
-matplotlib==3.10.8
+matplotlib==3.11.1
 opencv-python-headless==4.13.0.92
 annoy==1.17.3
 
-Django==6.0.4
+Django==6.0.7
 django-cors-headers==4.9.0
 django-filter==25.2
-PyJWT==2.12.1
+PyJWT==2.13.0
 django-graphql-jwt==0.4.0
 
 graphene==3.4.3
 graphene-django==3.2.3
 Markdown==3.10.2
-Pillow==12.2.0
+Pillow==12.3.0
 
-asyncinotify==4.4.2
+asyncinotify==4.4.4
 python-dateutil==2.9.0.post0
-pytz==2026.1.post1
-pyshp==3.0.3
-requests==2.33.1
+pytz==2026.2
+pyshp==3.1.4
+requests==2.34.2
 
 python-redis-lock==4.0.1
 redis==7.4.0
 psutil==7.2.2
 
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.12
 gunicorn==25.3.0
 
-pytest==9.0.3
+pytest==9.1.1
 pytest-django==4.12.0
 mock==5.2.0
 factory-boy==3.3.3
-coverage==7.13.5
-colorlog==6.10.1
+coverage==7.15.2
+colorlog==6.11.0
