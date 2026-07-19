@@ -102,6 +102,43 @@ class LibraryUser(UUIDModel, VersionedModel):
         return f'{self.library.name} ({self.user.username})'
 
 
+class LibraryInvitation(UUIDModel, VersionedModel):
+    """Shareable invitation to join a Library as a non-owner member.
+
+    The uuid4 primary key is the capability token (the same trust model as
+    thumbnail/download URLs): possession of the invite link is the grant.
+    Single-use, expiring and revocable.
+    """
+    library = models.ForeignKey(Library, related_name='invitations', on_delete=models.CASCADE)
+    created_by = models.ForeignKey(User, related_name='invitations_sent', on_delete=models.CASCADE)
+    expires_at = models.DateTimeField(help_text='Invitation cannot be accepted after this time')
+    revoked = models.BooleanField(default=False, help_text='Invitation was withdrawn by a library owner')
+    accepted_by = models.ForeignKey(User, blank=True, null=True, related_name='invitations_accepted', on_delete=models.SET_NULL)
+    accepted_at = models.DateTimeField(blank=True, null=True)
+
+    def __str__(self):
+        return f'{self.library.name} invitation ({self.id})'
+
+    @property
+    def valid(self):
+        return not self.revoked and self.accepted_at is None and self.expires_at > timezone.now()
+
+    @classmethod
+    def get_valid(cls, token):
+        """Return the invitation for a raw token string, or None.
+
+        None for malformed tokens, unknown tokens and known-but-spent/expired/
+        revoked ones alike, so callers can't distinguish (no token oracle).
+        """
+        from django.core.exceptions import ValidationError
+
+        try:
+            invitation = cls.objects.select_related('library', 'created_by').get(pk=token)
+        except (cls.DoesNotExist, ValidationError, ValueError):
+            return None
+        return invitation if invitation.valid else None
+
+
 class Camera(UUIDModel, VersionedModel):
     library = models.ForeignKey(Library, related_name='cameras', on_delete=models.CASCADE)
     make = models.CharField(max_length=128)

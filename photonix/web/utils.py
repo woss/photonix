@@ -8,6 +8,26 @@ from django.core.management import utils
 logger = logging.getLogger('photonix')
 
 
+DEMO_USERNAME = 'demo'
+
+
+def demo_mode_enabled():
+    return os.environ.get('DEMO', '').lower() in ('1', 'true', 'yes') and os.environ.get('ENV') != 'test'
+
+
+def demo_user_locked(user):
+    """Whether account/library-changing mutations are locked for this request.
+
+    Only the shared public demo account is locked, not the whole instance:
+    demo visitors all act as the 'demo' user, so blocking it keeps the public
+    demo from being defaced while accounts created via invitation or admin on
+    a demo instance keep working normally.
+    """
+    if not demo_mode_enabled():
+        return False
+    return user is None or user.is_anonymous or user.username == DEMO_USERNAME
+
+
 def _get_data_dir():
     if os.path.exists('/data'):
         return Path('/data')

@@ -28,7 +28,10 @@ class Command(BaseCommand):
 
             @sync_to_async
             def get_libraries():
-                return {l.path: l.library_id for l in LibraryPath.objects.filter(type='St', backend_type='Lo')}
+                # Honour the per-path "watch folder for new photos" setting —
+                # the check_libraries poll loop then adds/removes inotify
+                # watches within seconds of the toggle changing.
+                return {l.path: l.library_id for l in LibraryPath.objects.filter(type='St', backend_type='Lo', watch_for_changes=True)}
 
             @sync_to_async
             def record_photo_async(photo_path, library_id, event_mask):

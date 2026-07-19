@@ -33,6 +33,7 @@ class Command(BaseCommand):
         else:
             user.set_password(password)
             user.has_set_personal_info = True
+            user.is_staff = True
             user.save()
             print(f'User "{username}" created successfully and password set')
 
