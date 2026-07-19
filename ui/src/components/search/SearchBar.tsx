@@ -122,11 +122,11 @@ export function SearchBar() {
   return (
     <div
       ref={containerRef}
-      className="relative bg-neutral-800 rounded-b-lg pl-3 pr-2 py-1"
+      className="relative bg-neutral-800 rounded-b-lg"
       data-testid="search-bar"
     >
       <div
-        className="flex items-center gap-2 flex-wrap"
+        className="flex items-center gap-2 flex-wrap pl-3 pr-2 py-1.5"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

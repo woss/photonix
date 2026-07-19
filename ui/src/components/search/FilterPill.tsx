@@ -14,7 +14,7 @@ export function FilterPill({ id, name, group, onRemove }: FilterPillProps) {
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 bg-neutral-600 rounded-full px-3 py-1 text-sm text-white"
+      className="inline-flex items-center gap-1.5 bg-neutral-600 rounded-full pl-3 pr-2.5 py-1 text-sm text-white"
       data-testid={`filter-pill-${id}`}
     >
       <Icon className="w-3.5 h-3.5 text-neutral-300" />
