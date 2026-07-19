@@ -65,7 +65,7 @@ export function Header({
       style={{ height: 50 + safeAreaTop, paddingTop: safeAreaTop }}
     >
       {/* Logo and brand */}
-      <div className="flex items-center mx-2.5 text-white">
+      <div className="flex items-center mx-3 text-white">
         {/* Inside the native mobile app, a hamburger opens the app's drawer */}
         {isMobileApp && (
           <button
@@ -77,11 +77,15 @@ export function Header({
             <Menu className="w-[26px] h-[26px] text-white/90" />
           </button>
         )}
-        <img
-          src={Logo}
-          alt="Photonix Logo"
-          className="w-[30px] h-[30px] mr-2 rounded-full shadow-[0_0_6px_rgba(255,255,255,0.5)]"
-        />
+        {/* Spectral halo behind the mark: the brand strip colours as soft
+            light, replacing the old white glow */}
+        <span className="relative flex-none w-[30px] h-[30px] mr-[11px] before:content-[''] before:absolute before:-inset-[5px] before:rounded-full before:bg-[conic-gradient(from_210deg,var(--brand-1),var(--brand-2),var(--brand-3),var(--brand-4),var(--brand-5),var(--brand-1))] before:blur-[7px] before:opacity-[0.85]">
+          <img
+            src={Logo}
+            alt="Photonix Logo"
+            className="relative w-full h-full rounded-full"
+          />
+        </span>
         <span className="text-[26px] font-normal leading-tight">Photonix</span>
       </div>
 

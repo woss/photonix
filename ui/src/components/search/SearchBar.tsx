@@ -122,7 +122,7 @@ export function SearchBar() {
   return (
     <div
       ref={containerRef}
-      className="relative bg-neutral-800 rounded-b-lg px-2 py-1"
+      className="relative bg-neutral-800 rounded-b-lg pl-3 pr-2 py-1"
       data-testid="search-bar"
     >
       <div
