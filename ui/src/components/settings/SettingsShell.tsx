@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link, useRouter, useCanGoBack } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { ArrowLeft, KeyRound, Library, Users } from 'lucide-react'
 import { useQuery } from '@apollo/client/react'
 import { GET_PROFILE } from '../../lib/auth/graphql'
@@ -18,16 +18,13 @@ const NAV_LINK_ACTIVE_CLASS = 'bg-white/10 text-white'
  */
 export function SettingsShell({ children }: SettingsShellProps) {
   const router = useRouter()
-  const canGoBack = useCanGoBack()
   const { data: profileData } = useQuery(GET_PROFILE)
   const isStaff = !!profileData?.profile?.isStaff
 
+  // Always exits the settings area (in-section navigation has the sidebar;
+  // the browser back button still walks history normally).
   const goBack = () => {
-    if (canGoBack) {
-      router.history.back()
-    } else {
-      router.navigate({ to: '/' })
-    }
+    router.navigate({ to: '/' })
   }
 
   const navItems = [
