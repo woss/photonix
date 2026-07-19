@@ -28,10 +28,10 @@ export function Tabs() {
       className="fixed bottom-5 left-5 right-5 z-10 mx-auto max-w-md sm:max-w-lg"
       data-testid="tabs-bar"
     >
-      <div className="relative flex overflow-hidden rounded-[20px] bg-[rgba(50,50,50,0.9)] shadow-[0_4px_8px_1px_rgba(0,0,0,0.3)]">
+      <div className="relative flex h-11 overflow-hidden rounded-full bg-[rgba(50,50,50,0.9)] shadow-[0_4px_8px_1px_rgba(0,0,0,0.3)]">
         {/* Sliding highlight */}
         <div
-          className="absolute inset-y-0 rounded-[20px] bg-[#ddd] transition-[left] duration-200 ease-in-out"
+          className="absolute inset-y-0 rounded-full bg-[#ddd] transition-[left] duration-200 ease-in-out"
           style={{
             width: `${100 / TABS.length}%`,
             left: `${(100 / TABS.length) * activeIndex}%`,
@@ -45,7 +45,7 @@ export function Tabs() {
               key={tab.to}
               to={tab.to}
               onClick={() => clearAll()}
-              className={`relative z-10 flex flex-1 items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+              className={`relative z-10 flex flex-1 items-center justify-center gap-2 text-sm font-medium transition-colors ${
                 isActive ? 'text-[#1d1d1d]' : 'text-[#ddd] hover:text-white'
               }`}
               data-testid={`tab-${tab.label.toLowerCase()}`}
