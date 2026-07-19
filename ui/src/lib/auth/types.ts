@@ -62,7 +62,12 @@ export interface EnvironmentResponse {
 
 export interface ProfileResponse {
   profile: {
+    id: string
     username: string
     email: string | null
+    firstName: string | null
+    lastName: string | null
+    isStaff: boolean
+    avatarUrl: string | null
   } | null
 }

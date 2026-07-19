@@ -20,11 +20,18 @@ import { Route as OnboardingStep3RouteImport } from './routes/onboarding/step3'
 import { Route as OnboardingStep2RouteImport } from './routes/onboarding/step2'
 import { Route as OnboardingStep1RouteImport } from './routes/onboarding/step1'
 import { Route as OnboardingCompleteRouteImport } from './routes/onboarding/complete'
+import { Route as InviteTokenRouteImport } from './routes/invite/$token'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedBrowseRouteImport } from './routes/_authenticated/_browse'
+import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
 import { Route as AuthenticatedBrowseIndexRouteImport } from './routes/_authenticated/_browse/index'
+import { Route as AuthenticatedSettingsUsersRouteImport } from './routes/_authenticated/settings/users'
+import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
 import { Route as AuthenticatedPhotoIdRouteImport } from './routes/_authenticated/photo/$id'
 import { Route as AuthenticatedBrowseMapRouteImport } from './routes/_authenticated/_browse/map'
+import { Route as AuthenticatedSettingsLibrariesIndexRouteImport } from './routes/_authenticated/settings/libraries/index'
 import { Route as AuthenticatedBrowseAlbumsIndexRouteImport } from './routes/_authenticated/_browse/albums/index'
+import { Route as AuthenticatedSettingsLibrariesLibraryIdRouteImport } from './routes/_authenticated/settings/libraries/$libraryId'
 import { Route as AuthenticatedBrowseAlbumsAlbumIdRouteImport } from './routes/_authenticated/_browse/albums/$albumId'
 
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -81,15 +88,43 @@ const OnboardingCompleteRoute = OnboardingCompleteRouteImport.update({
   path: '/complete',
   getParentRoute: () => OnboardingRoute,
 } as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedBrowseRoute = AuthenticatedBrowseRouteImport.update({
   id: '/_browse',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSettingsIndexRoute =
+  AuthenticatedSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedBrowseIndexRoute =
   AuthenticatedBrowseIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedBrowseRoute,
+  } as any)
+const AuthenticatedSettingsUsersRoute =
+  AuthenticatedSettingsUsersRouteImport.update({
+    id: '/users',
+    path: '/users',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
+const AuthenticatedSettingsAccountRoute =
+  AuthenticatedSettingsAccountRouteImport.update({
+    id: '/account',
+    path: '/account',
+    getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
 const AuthenticatedPhotoIdRoute = AuthenticatedPhotoIdRouteImport.update({
   id: '/photo/$id',
@@ -101,11 +136,23 @@ const AuthenticatedBrowseMapRoute = AuthenticatedBrowseMapRouteImport.update({
   path: '/map',
   getParentRoute: () => AuthenticatedBrowseRoute,
 } as any)
+const AuthenticatedSettingsLibrariesIndexRoute =
+  AuthenticatedSettingsLibrariesIndexRouteImport.update({
+    id: '/libraries/',
+    path: '/libraries/',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
 const AuthenticatedBrowseAlbumsIndexRoute =
   AuthenticatedBrowseAlbumsIndexRouteImport.update({
     id: '/albums/',
     path: '/albums/',
     getParentRoute: () => AuthenticatedBrowseRoute,
+  } as any)
+const AuthenticatedSettingsLibrariesLibraryIdRoute =
+  AuthenticatedSettingsLibrariesLibraryIdRouteImport.update({
+    id: '/libraries/$libraryId',
+    path: '/libraries/$libraryId',
+    getParentRoute: () => AuthenticatedSettingsRoute,
   } as any)
 const AuthenticatedBrowseAlbumsAlbumIdRoute =
   AuthenticatedBrowseAlbumsAlbumIdRouteImport.update({
@@ -119,6 +166,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/onboarding': typeof OnboardingRouteWithChildren
+  '/settings': typeof AuthenticatedSettingsRouteWithChildren
+  '/invite/$token': typeof InviteTokenRoute
   '/onboarding/complete': typeof OnboardingCompleteRoute
   '/onboarding/step1': typeof OnboardingStep1Route
   '/onboarding/step2': typeof OnboardingStep2Route
@@ -128,13 +177,19 @@ export interface FileRoutesByFullPath {
   '/onboarding/': typeof OnboardingIndexRoute
   '/map': typeof AuthenticatedBrowseMapRoute
   '/photo/$id': typeof AuthenticatedPhotoIdRoute
+  '/settings/account': typeof AuthenticatedSettingsAccountRoute
+  '/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/albums/$albumId': typeof AuthenticatedBrowseAlbumsAlbumIdRoute
+  '/settings/libraries/$libraryId': typeof AuthenticatedSettingsLibrariesLibraryIdRoute
   '/albums/': typeof AuthenticatedBrowseAlbumsIndexRoute
+  '/settings/libraries/': typeof AuthenticatedSettingsLibrariesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedBrowseIndexRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/onboarding/complete': typeof OnboardingCompleteRoute
   '/onboarding/step1': typeof OnboardingStep1Route
   '/onboarding/step2': typeof OnboardingStep2Route
@@ -144,8 +199,13 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingIndexRoute
   '/map': typeof AuthenticatedBrowseMapRoute
   '/photo/$id': typeof AuthenticatedPhotoIdRoute
+  '/settings/account': typeof AuthenticatedSettingsAccountRoute
+  '/settings/users': typeof AuthenticatedSettingsUsersRoute
+  '/settings': typeof AuthenticatedSettingsIndexRoute
   '/albums/$albumId': typeof AuthenticatedBrowseAlbumsAlbumIdRoute
+  '/settings/libraries/$libraryId': typeof AuthenticatedSettingsLibrariesLibraryIdRoute
   '/albums': typeof AuthenticatedBrowseAlbumsIndexRoute
+  '/settings/libraries': typeof AuthenticatedSettingsLibrariesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -154,6 +214,8 @@ export interface FileRoutesById {
   '/logout': typeof LogoutRoute
   '/onboarding': typeof OnboardingRouteWithChildren
   '/_authenticated/_browse': typeof AuthenticatedBrowseRouteWithChildren
+  '/_authenticated/settings': typeof AuthenticatedSettingsRouteWithChildren
+  '/invite/$token': typeof InviteTokenRoute
   '/onboarding/complete': typeof OnboardingCompleteRoute
   '/onboarding/step1': typeof OnboardingStep1Route
   '/onboarding/step2': typeof OnboardingStep2Route
@@ -163,9 +225,14 @@ export interface FileRoutesById {
   '/onboarding/': typeof OnboardingIndexRoute
   '/_authenticated/_browse/map': typeof AuthenticatedBrowseMapRoute
   '/_authenticated/photo/$id': typeof AuthenticatedPhotoIdRoute
+  '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
+  '/_authenticated/settings/users': typeof AuthenticatedSettingsUsersRoute
   '/_authenticated/_browse/': typeof AuthenticatedBrowseIndexRoute
+  '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/_browse/albums/$albumId': typeof AuthenticatedBrowseAlbumsAlbumIdRoute
+  '/_authenticated/settings/libraries/$libraryId': typeof AuthenticatedSettingsLibrariesLibraryIdRoute
   '/_authenticated/_browse/albums/': typeof AuthenticatedBrowseAlbumsIndexRoute
+  '/_authenticated/settings/libraries/': typeof AuthenticatedSettingsLibrariesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -174,6 +241,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/logout'
     | '/onboarding'
+    | '/settings'
+    | '/invite/$token'
     | '/onboarding/complete'
     | '/onboarding/step1'
     | '/onboarding/step2'
@@ -183,13 +252,19 @@ export interface FileRouteTypes {
     | '/onboarding/'
     | '/map'
     | '/photo/$id'
+    | '/settings/account'
+    | '/settings/users'
+    | '/settings/'
     | '/albums/$albumId'
+    | '/settings/libraries/$libraryId'
     | '/albums/'
+    | '/settings/libraries/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/logout'
+    | '/invite/$token'
     | '/onboarding/complete'
     | '/onboarding/step1'
     | '/onboarding/step2'
@@ -199,8 +274,13 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/map'
     | '/photo/$id'
+    | '/settings/account'
+    | '/settings/users'
+    | '/settings'
     | '/albums/$albumId'
+    | '/settings/libraries/$libraryId'
     | '/albums'
+    | '/settings/libraries'
   id:
     | '__root__'
     | '/_authenticated'
@@ -208,6 +288,8 @@ export interface FileRouteTypes {
     | '/logout'
     | '/onboarding'
     | '/_authenticated/_browse'
+    | '/_authenticated/settings'
+    | '/invite/$token'
     | '/onboarding/complete'
     | '/onboarding/step1'
     | '/onboarding/step2'
@@ -217,9 +299,14 @@ export interface FileRouteTypes {
     | '/onboarding/'
     | '/_authenticated/_browse/map'
     | '/_authenticated/photo/$id'
+    | '/_authenticated/settings/account'
+    | '/_authenticated/settings/users'
     | '/_authenticated/_browse/'
+    | '/_authenticated/settings/'
     | '/_authenticated/_browse/albums/$albumId'
+    | '/_authenticated/settings/libraries/$libraryId'
     | '/_authenticated/_browse/albums/'
+    | '/_authenticated/settings/libraries/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -227,6 +314,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   LogoutRoute: typeof LogoutRoute
   OnboardingRoute: typeof OnboardingRouteWithChildren
+  InviteTokenRoute: typeof InviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -308,6 +396,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingCompleteRouteImport
       parentRoute: typeof OnboardingRoute
     }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/_browse': {
       id: '/_authenticated/_browse'
       path: ''
@@ -315,12 +417,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrowseRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings/': {
+      id: '/_authenticated/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/_browse/': {
       id: '/_authenticated/_browse/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedBrowseIndexRouteImport
       parentRoute: typeof AuthenticatedBrowseRoute
+    }
+    '/_authenticated/settings/users': {
+      id: '/_authenticated/settings/users'
+      path: '/users'
+      fullPath: '/settings/users'
+      preLoaderRoute: typeof AuthenticatedSettingsUsersRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
+    '/_authenticated/settings/account': {
+      id: '/_authenticated/settings/account'
+      path: '/account'
+      fullPath: '/settings/account'
+      preLoaderRoute: typeof AuthenticatedSettingsAccountRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
     }
     '/_authenticated/photo/$id': {
       id: '/_authenticated/photo/$id'
@@ -336,12 +459,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBrowseMapRouteImport
       parentRoute: typeof AuthenticatedBrowseRoute
     }
+    '/_authenticated/settings/libraries/': {
+      id: '/_authenticated/settings/libraries/'
+      path: '/libraries'
+      fullPath: '/settings/libraries/'
+      preLoaderRoute: typeof AuthenticatedSettingsLibrariesIndexRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
     '/_authenticated/_browse/albums/': {
       id: '/_authenticated/_browse/albums/'
       path: '/albums'
       fullPath: '/albums/'
       preLoaderRoute: typeof AuthenticatedBrowseAlbumsIndexRouteImport
       parentRoute: typeof AuthenticatedBrowseRoute
+    }
+    '/_authenticated/settings/libraries/$libraryId': {
+      id: '/_authenticated/settings/libraries/$libraryId'
+      path: '/libraries/$libraryId'
+      fullPath: '/settings/libraries/$libraryId'
+      preLoaderRoute: typeof AuthenticatedSettingsLibrariesLibraryIdRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
     }
     '/_authenticated/_browse/albums/$albumId': {
       id: '/_authenticated/_browse/albums/$albumId'
@@ -370,13 +507,38 @@ const AuthenticatedBrowseRouteChildren: AuthenticatedBrowseRouteChildren = {
 const AuthenticatedBrowseRouteWithChildren =
   AuthenticatedBrowseRoute._addFileChildren(AuthenticatedBrowseRouteChildren)
 
+interface AuthenticatedSettingsRouteChildren {
+  AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
+  AuthenticatedSettingsUsersRoute: typeof AuthenticatedSettingsUsersRoute
+  AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
+  AuthenticatedSettingsLibrariesLibraryIdRoute: typeof AuthenticatedSettingsLibrariesLibraryIdRoute
+  AuthenticatedSettingsLibrariesIndexRoute: typeof AuthenticatedSettingsLibrariesIndexRoute
+}
+
+const AuthenticatedSettingsRouteChildren: AuthenticatedSettingsRouteChildren = {
+  AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
+  AuthenticatedSettingsUsersRoute: AuthenticatedSettingsUsersRoute,
+  AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
+  AuthenticatedSettingsLibrariesLibraryIdRoute:
+    AuthenticatedSettingsLibrariesLibraryIdRoute,
+  AuthenticatedSettingsLibrariesIndexRoute:
+    AuthenticatedSettingsLibrariesIndexRoute,
+}
+
+const AuthenticatedSettingsRouteWithChildren =
+  AuthenticatedSettingsRoute._addFileChildren(
+    AuthenticatedSettingsRouteChildren,
+  )
+
 interface AuthenticatedRouteChildren {
   AuthenticatedBrowseRoute: typeof AuthenticatedBrowseRouteWithChildren
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRouteWithChildren
   AuthenticatedPhotoIdRoute: typeof AuthenticatedPhotoIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedBrowseRoute: AuthenticatedBrowseRouteWithChildren,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRouteWithChildren,
   AuthenticatedPhotoIdRoute: AuthenticatedPhotoIdRoute,
 }
 
@@ -413,6 +575,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   LogoutRoute: LogoutRoute,
   OnboardingRoute: OnboardingRouteWithChildren,
+  InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

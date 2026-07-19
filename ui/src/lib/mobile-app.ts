@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { useUIStore } from './ui/store'
 
 /**
  * Integration hooks for the native mobile/desktop wrapper apps.
@@ -58,7 +57,10 @@ export function installHostAppHooks(): void {
     },
   }
 
+  // Settings is a routed page now. This full-navigation fallback is replaced
+  // with an SPA router.navigate() binding once the router mounts (main.tsx),
+  // so the wrapper contract keeps working even if called very early.
   window.showSettings = () => {
-    useUIStore.getState().openModal('settings')
+    window.location.assign('/settings')
   }
 }

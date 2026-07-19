@@ -35,6 +35,7 @@ export function BrowseLayout({ children }: BrowseLayoutProps) {
     ? {
         username: profileData?.profile?.username ?? user.username,
         email: profileData?.profile?.email ?? '',
+        avatarUrl: profileData?.profile?.avatarUrl ?? null,
       }
     : null
 

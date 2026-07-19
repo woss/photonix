@@ -1,5 +1,4 @@
 import { createFileRoute, redirect, Outlet } from '@tanstack/react-router'
-import { ModalRoot } from '../components/ModalRoot'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: ({ context, location }) => {
@@ -11,10 +10,5 @@ export const Route = createFileRoute('/_authenticated')({
       })
     }
   },
-  component: () => (
-    <>
-      <Outlet />
-      <ModalRoot />
-    </>
-  ),
+  component: () => <Outlet />,
 })

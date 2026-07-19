@@ -1,17 +1,9 @@
 import { Link } from '@tanstack/react-router'
-import {
-  Menu,
-  MoreVertical,
-  CircleUser,
-  Library,
-  Settings,
-  KeyRound,
-  LogOut,
-} from 'lucide-react'
+import { Menu, Library, Settings, LogOut } from 'lucide-react'
 import Logo from '../../assets/logo.svg'
-import { useUIStore } from '../../lib/ui/store'
 import { useLayoutStore } from '../../lib/mobile-app'
 import { Notifications } from '../notifications/Notifications'
+import { Avatar } from '../ui/Avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +15,7 @@ import {
 interface UserProfile {
   username: string
   email: string
+  avatarUrl?: string | null
 }
 
 interface LibraryItem {
@@ -46,18 +39,10 @@ export function Header({
   activeLibraryId,
   onLibraryChange,
 }: HeaderProps) {
-  const openModal = useUIStore((s) => s.openModal)
   const isMobileApp = useLayoutStore((s) => s.isMobileApp)
   const safeAreaTop = useLayoutStore((s) => s.safeAreaTop)
 
   const isActiveLibrary = (id: string) => activeLibraryId === id
-
-  // Open an app modal after the menu has finished closing. Deferring avoids a
-  // focus/pointer-events race between the closing Radix menu and the opening
-  // Radix dialog.
-  const openModalDeferred = (modal: 'account' | 'settings') => {
-    setTimeout(() => openModal(modal), 0)
-  }
 
   return (
     <header
@@ -95,27 +80,37 @@ export function Header({
       {/* Background-task progress bell */}
       <Notifications />
 
-      {/* User menu */}
+      {/* User menu — the avatar is the trigger */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="p-2.5 cursor-pointer hover:bg-white/10 transition-colors outline-none"
+            className="p-2.5 mr-0.5 cursor-pointer rounded-full hover:bg-white/10 transition-colors outline-none"
             aria-label="Open menu"
             data-testid="header-menu-button"
           >
-            <MoreVertical className="w-[30px] h-[30px] text-white/90" />
+            <Avatar
+              username={profile?.username ?? '?'}
+              avatarUrl={profile?.avatarUrl}
+              size={30}
+              data-testid="header-avatar"
+            />
           </button>
         </DropdownMenuTrigger>
 
         <DropdownMenuContent
           align="end"
           sideOffset={0}
-          className="w-[200px] rounded-none border-0 bg-[#444] p-0 text-neutral-300 shadow-[-3px_8px_17px_rgba(0,0,0,0.15)]"
+          className="w-[220px] rounded-none border-0 bg-[#444] p-0 text-neutral-300 shadow-[-3px_8px_17px_rgba(0,0,0,0.15)]"
         >
           {/* Profile section */}
           {profile && (
             <DropdownMenuLabel className="flex items-center px-4 py-3 font-normal">
-              <CircleUser className="w-6 h-6 mr-2.5 text-white/90" />
+              <Avatar
+                username={profile.username}
+                avatarUrl={profile.avatarUrl}
+                size={28}
+                className="mr-2.5"
+              />
               <div className="flex flex-col min-w-0">
                 <span
                   className="font-semibold text-sm leading-[18px] truncate"
@@ -158,24 +153,12 @@ export function Header({
             </DropdownMenuItem>
           ))}
 
-          {/* Account */}
-          <DropdownMenuItem
-            onSelect={() => openModalDeferred('account')}
-            className={MENU_ITEM_CLASS}
-            data-testid="account-menu-item"
-          >
-            <KeyRound className="w-6 h-6 mr-2.5 text-white/90" />
-            <span className="text-sm">Account</span>
-          </DropdownMenuItem>
-
-          {/* Settings */}
-          <DropdownMenuItem
-            onSelect={() => openModalDeferred('settings')}
-            className={MENU_ITEM_CLASS}
-            data-testid="settings-menu-item"
-          >
-            <Settings className="w-6 h-6 mr-2.5 text-white/90" />
-            <span className="text-sm">Settings</span>
+          {/* Settings (account management lives inside the settings area) */}
+          <DropdownMenuItem asChild className={MENU_ITEM_CLASS}>
+            <Link to="/settings" data-testid="settings-menu-item">
+              <Settings className="w-6 h-6 mr-2.5 text-white/90" />
+              <span className="text-sm">Settings</span>
+            </Link>
           </DropdownMenuItem>
 
           {/* Logout */}

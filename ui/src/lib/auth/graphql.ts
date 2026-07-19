@@ -73,16 +73,21 @@ export const ENVIRONMENT: TypedDocumentNode<
   }
 `
 
-// The logged-in user's profile (username + email), used to populate the
-// header account menu.
+// The logged-in user's profile, used for the header account menu and the
+// settings area (isStaff gates the Users page, avatarUrl feeds the avatar).
 export const GET_PROFILE: TypedDocumentNode<
   ProfileResponse,
   Record<string, never>
 > = gql`
   query Profile {
     profile {
+      id
       username
       email
+      firstName
+      lastName
+      isStaff
+      avatarUrl
     }
   }
 `

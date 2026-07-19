@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ApolloProvider } from '@apollo/client/react'
 import { RouterProvider } from '@tanstack/react-router'
@@ -18,6 +18,15 @@ installHostAppHooks()
 function AppWithRouter() {
   const auth = useAuth()
   const router = createAppRouter(auth)
+
+  // Upgrade the native wrappers' `window.showSettings()` from the full-page
+  // fallback (installHostAppHooks) to an in-app navigation.
+  useEffect(() => {
+    window.showSettings = () => {
+      router.navigate({ to: '/settings' })
+    }
+  }, [router])
+
   return <RouterProvider router={router} />
 }
 
