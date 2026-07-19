@@ -97,6 +97,39 @@ test.describe.serial('Thumbnails Grid', () => {
     await expect(page.locator('[data-testid^="thumbnail-selected-"]')).toHaveCount(3)
   })
 
+  test('enters selection mode with mouse long-press', async ({ page }) => {
+    await login(page)
+
+    const grid = page.getByTestId('thumbnails-grid')
+    await expect(grid).toBeVisible()
+
+    const firstPhotoId = testPhotoIds[0]
+    const thumbnail = page.getByTestId(`thumbnail-${firstPhotoId}`)
+    await expect(thumbnail).toBeVisible()
+
+    // Press and hold the primary mouse button without moving
+    const box = (await thumbnail.boundingBox())!
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.waitForTimeout(700)
+    await page.mouse.up()
+
+    // The photo should be selected and the click swallowed (no navigation)
+    await expect(
+      page.getByTestId(`thumbnail-selected-${firstPhotoId}`)
+    ).toBeVisible()
+    await expect(page).toHaveURL(/\/$/)
+
+    // A quick click on another photo now toggles it into the selection
+    await page.getByTestId(`thumbnail-${testPhotoIds[1]}`).click()
+    await expect(
+      page.getByTestId(`thumbnail-selected-${testPhotoIds[1]}`)
+    ).toBeVisible()
+    await expect(page.locator('[data-testid^="thumbnail-selected-"]')).toHaveCount(2)
+
+    await page.keyboard.press('Escape')
+  })
+
   test('clears selection with Escape key', async ({ page }) => {
     await login(page)
 

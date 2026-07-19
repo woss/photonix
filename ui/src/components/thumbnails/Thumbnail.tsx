@@ -16,6 +16,9 @@ interface ThumbnailProps {
 }
 
 const LONG_PRESS_MS = 500
+// Cancel the long press only once the pointer drifts this far, so mouse
+// jitter and small touch wobble don't defeat it.
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10
 
 export const Thumbnail = memo(function Thumbnail({
   photo,
@@ -31,6 +34,7 @@ export const Thumbnail = memo(function Thumbnail({
   const containerRef = useRef<HTMLLIElement>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressed = useRef(false)
+  const pressOrigin = useRef<{ x: number; y: number } | null>(null)
 
   // Refetch any mounted filter facets so the Rating range reflects the change.
   const [updateRating] = useMutation(UPDATE_PHOTO_RATING, {
@@ -67,21 +71,41 @@ export const Thumbnail = memo(function Thumbnail({
   const canHover =
     typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
 
-  // Touch long-press to enter selection mode.
+  // Long-press (any pointer type, including mouse) to enter selection mode.
   const cancelLongPress = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
+    pressOrigin.current = null
   }
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType !== 'touch' || !onLongPress) return
     longPressed.current = false
+    // Primary button only; skip when selection mode is already active —
+    // a plain click toggles selection there, so a long press would undo it.
+    if (!onLongPress || e.button !== 0 || isSelectable) return
+    pressOrigin.current = { x: e.clientX, y: e.clientY }
     longPressTimer.current = setTimeout(() => {
       longPressed.current = true
       onLongPress()
     }, LONG_PRESS_MS)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!longPressTimer.current || !pressOrigin.current) return
+    const dx = e.clientX - pressOrigin.current.x
+    const dy = e.clientY - pressOrigin.current.y
+    if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_TOLERANCE_PX) {
+      cancelLongPress()
+    }
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Swallow the compatibility mousedown that can follow a touch long-press —
+    // it would re-toggle the selection the long press just made.
+    if (longPressed.current) return
+    onMouseDown(e)
   }
 
   const handleClickCapture = (e: React.MouseEvent) => {
@@ -101,12 +125,12 @@ export const Thumbnail = memo(function Thumbnail({
       className={`relative w-full pb-[100%] rounded-[10px] cursor-pointer list-none bg-[#292929] ${
         isSelected ? 'bg-transparent' : ''
       }`}
-      onMouseDown={onMouseDown}
+      onMouseDown={handleMouseDown}
       onClick={onClick}
       onClickCapture={handleClickCapture}
       onPointerDown={handlePointerDown}
       onPointerUp={cancelLongPress}
-      onPointerMove={cancelLongPress}
+      onPointerMove={handlePointerMove}
       onPointerCancel={cancelLongPress}
       onPointerLeave={cancelLongPress}
     >
@@ -119,6 +143,7 @@ export const Thumbnail = memo(function Thumbnail({
           <img
             src={photo.thumbnailUrl}
             alt=""
+            draggable={false}
             className={`w-full h-full rounded-[10px] object-cover transition-opacity duration-300 ease-in ${
               isLoaded ? 'opacity-100' : 'opacity-0'
             }`}
