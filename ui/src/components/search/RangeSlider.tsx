@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 interface RangeSliderProps {
   count: number
   minIndex: number
@@ -9,6 +11,10 @@ interface RangeSliderProps {
 /**
  * Two-handle range slider over an index domain [0, count-1]. The caller maps
  * indices back to the actual (unevenly-spaced) facet values.
+ *
+ * Values are held locally while the user is interacting and only committed on
+ * release — committing per drag-step re-runs the facets query and re-renders
+ * the panel mid-drag, which breaks the native range-input drag.
  */
 export function RangeSlider({
   count,
@@ -17,15 +23,24 @@ export function RangeSlider({
   onChange,
   formatValue,
 }: RangeSliderProps) {
+  const [drag, setDrag] = useState<[number, number] | null>(null)
+  const [lo, hi] = drag ?? [minIndex, maxIndex]
   const max = Math.max(0, count - 1)
-  const leftPct = max > 0 ? (minIndex / max) * 100 : 0
-  const rightPct = max > 0 ? (maxIndex / max) * 100 : 100
+  const leftPct = max > 0 ? (lo / max) * 100 : 0
+  const rightPct = max > 0 ? (hi / max) * 100 : 100
+
+  const commit = () => {
+    if (drag) {
+      onChange(drag[0], drag[1])
+      setDrag(null)
+    }
+  }
 
   return (
     <div className="px-1">
       <div className="mb-1 flex justify-between text-xs text-neutral-400">
-        <span data-testid="range-min">{formatValue(minIndex)}</span>
-        <span data-testid="range-max">{formatValue(maxIndex)}</span>
+        <span data-testid="range-min">{formatValue(lo)}</span>
+        <span data-testid="range-max">{formatValue(hi)}</span>
       </div>
       <div className="relative h-4">
         {/* Track */}
@@ -41,10 +56,11 @@ export function RangeSlider({
           min={0}
           max={max}
           step={1}
-          value={minIndex}
-          onChange={(e) =>
-            onChange(Math.min(Number(e.target.value), maxIndex), maxIndex)
-          }
+          value={lo}
+          onChange={(e) => setDrag([Math.min(Number(e.target.value), hi), hi])}
+          onPointerUp={commit}
+          onKeyUp={commit}
+          onBlur={commit}
           aria-label="Minimum"
         />
         <input
@@ -53,10 +69,11 @@ export function RangeSlider({
           min={0}
           max={max}
           step={1}
-          value={maxIndex}
-          onChange={(e) =>
-            onChange(minIndex, Math.max(Number(e.target.value), minIndex))
-          }
+          value={hi}
+          onChange={(e) => setDrag([lo, Math.max(Number(e.target.value), lo)])}
+          onPointerUp={commit}
+          onKeyUp={commit}
+          onBlur={commit}
           aria-label="Maximum"
         />
       </div>

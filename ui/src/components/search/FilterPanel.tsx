@@ -66,13 +66,17 @@ export function FilterPanel() {
     return parts.join(' ') || undefined
   }, [selectedFilters, activeLibraryId])
 
-  const { data } = useQuery(GET_FILTER_FACETS, {
+  const { data: freshData, previousData } = useQuery(GET_FILTER_FACETS, {
     variables: { libraryId: activeLibraryId!, multiFilter },
     skip: !activeLibraryId,
     // Refresh on every open so edits made elsewhere (ratings, tags, face
     // renames) are reflected without a reload.
     fetchPolicy: 'cache-and-network',
   })
+  // While a narrowed query (changed multiFilter) is in flight, data is
+  // undefined — keep the previous facets so the panel doesn't unmount and
+  // kill an in-progress slider drag.
+  const data = freshData ?? previousData
 
   const numericFacets = useMemo<NumericFacet[]>(() => {
     if (!data) return []
@@ -275,7 +279,7 @@ export function FilterPanel() {
 
   return (
     <div
-      className="group/filters border-t border-neutral-700 bg-neutral-800"
+      className="group/filters rounded-b-lg border-t border-neutral-700 bg-neutral-800"
       data-testid="filter-panel"
     >
       {/* Horizontal strip in a Radix ScrollArea: the native bar is replaced by a
@@ -287,7 +291,7 @@ export function FilterPanel() {
       >
         <ScrollAreaPrimitive.Viewport className="h-52 w-full">
           {/* Order mirrors master's FiltersContainer. */}
-          <div className="flex h-full gap-6 p-4">
+          <div className="flex h-full gap-6 px-3 py-4">
           {/* Objects */}
           {tagColumn('facet-objects', 'Objects', data.allObjectTags, 'Objects')}
 
