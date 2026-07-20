@@ -128,6 +128,23 @@ export function Thumbnails({ albumId }: ThumbnailsProps = {}) {
         mutation: ASSIGN_TAG_TO_PHOTOS,
         variables: { name, photoIds: selectedIds.join(','), tagType },
       })
+      // The mutation only returns { ok }, so Apollo can't update the cache on
+      // its own. Drop the cached lists this assignment invalidates so they
+      // refetch fresh when next viewed — otherwise the newly added photos
+      // don't show up: any album/tag-filtered photo grid, and (for an album)
+      // the album grid whose counts changed. The current unfiltered grid is
+      // left untouched so it doesn't flash.
+      client.cache.modify({
+        fields: {
+          allPhotos(existing, { DELETE, storeFieldName }) {
+            return storeFieldName.includes('tag:') ? DELETE : existing
+          },
+          ...(tagType === 'A'
+            ? { albumList: (_existing, { DELETE }) => DELETE }
+            : {}),
+        },
+      })
+      client.cache.gc()
       clearSelection()
     },
     [client, selectedIds, clearSelection]
